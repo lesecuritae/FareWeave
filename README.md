@@ -1,6 +1,6 @@
 # FareWeave
 
-![FareWeave – selbst gehosteter Reisevergleich ohne KI](docs/assets/readme-hero.webp)
+![FareWeave – selbst gehosteter Reisevergleich ohne KI](docs/assets/readme-hero.jpg)
 
 **FareWeave ist ein selbst gehosteter Reisevergleich ohne KI mit Fokus auf Reisen aus Deutschland.**
 
