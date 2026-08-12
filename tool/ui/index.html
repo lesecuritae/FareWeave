@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>FareWeave – Reisen transparent vergleichen</title>
+  <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+  <meta name="theme-color" content="#103b4a">
+  <link rel="stylesheet" href="/assets/styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true">↗</span>
+      <div>
+        <strong>FareWeave</strong>
+        <span>Die ganze Reise. Klar verglichen.</span>
+      </div>
+    </div>
+    <div class="status" id="statusBadge">Bereit</div>
+  </header>
+
+  <main class="shell">
+    <section class="search-panel">
+      <div class="mode-switch" role="tablist" aria-label="Reiseart">
+        <button type="button" class="mode active" data-mode="ground"><strong>Bahn &amp; Bus</strong><span>Reine Bodenreise</span></button>
+        <button type="button" class="mode" data-mode="flight"><strong>Komplette Reise</strong><span>Bahn/Bus + Flug + Transfer + Unterkunft</span></button>
+        <button type="button" class="mode" data-mode="flight_stay"><strong>Flug &amp; Unterkunft</strong><span>Ohne Bahn-/Buszubringer</span></button>
+      </div>
+
+      <form id="searchForm">
+        <div class="route-grid">
+          <label class="field grow">
+            <span>Von</span>
+            <input id="origin" name="origin" placeholder="Startbahnhof oder Ort" autocomplete="off" required>
+          </label>
+          <div class="route-arrow" aria-hidden="true">→</div>
+          <label class="field grow">
+            <span>Nach</span>
+            <input id="destination" name="destination" placeholder="Zielort" autocomplete="off" required>
+          </label>
+        </div>
+
+        <div class="date-grid">
+          <label class="field departure-field">
+            <span>Abreise</span>
+            <input id="departureDate" type="date" required>
+          </label>
+          <label class="field return-field">
+            <span>Rückreise <small>(optional)</small></span>
+            <input id="returnDate" type="date">
+          </label>
+          <button id="oneWayButton" type="button" class="secondary one-way-button" aria-pressed="false">Nur Hinfahrt</button>
+          <label class="field compact departure-time-field">
+            <span>Frühestens</span>
+            <input id="departureAfter" type="time" value="06:00" required>
+          </label>
+        </div>
+
+        <div class="priority-row" id="ticketPanel">
+          <div class="ticket-toggle">
+            <div>
+              <strong>Deutschlandticket vorhanden?</strong>
+              <span>D-Ticket und passende Mischverbindungen werden bevorzugt geprüft.</span>
+            </div>
+            <div class="yes-no" role="radiogroup" aria-label="Deutschlandticket">
+              <button type="button" class="choice" data-dticket="true">Ja</button>
+              <button type="button" class="choice active" data-dticket="false">Nein</button>
+            </div>
+          </div>
+          <label class="dticket-only hidden" id="dticketOnlyRow"><input id="dticketOnly" type="checkbox"> <span><strong>Nur D-Ticket-Verbindungen</strong>Keine ICE-, IC-, Flix- oder sonstigen Zusatzfahrkarten.</span></label>
+        </div>
+
+        <section class="lodging-panel hidden" id="lodgingPanel" aria-labelledby="lodgingTitle">
+          <div class="section-heading">
+            <div><span class="section-kicker">Übernachten</span><h2 id="lodgingTitle">Welche Unterkunft passt?</h2></div>
+            <span class="section-note">Nur verifizierte Gesamtpreise</span>
+          </div>
+          <div class="property-tabs" role="radiogroup" aria-label="Unterkunftsart">
+            <button type="button" class="property-tab active" data-hotel-type="hotel"><strong>Hotel</strong><span>klassisch &amp; komfortabel</span></button>
+            <button type="button" class="property-tab" data-hotel-type="hostel"><strong>Hostel</strong><span>günstig &amp; gemeinschaftlich</span></button>
+            <button type="button" class="property-tab" data-hotel-type="apartment"><strong>Apartment</strong><span>mehr Platz &amp; Küche</span></button>
+            <button type="button" class="property-tab" data-hotel-type="resort"><strong>Resort</strong><span>Hotelanlage</span></button>
+            <button type="button" class="property-tab" data-hotel-type="none"><strong>Ohne</strong><span>keine Unterkunft</span></button>
+          </div>
+          <div class="lodging-options">
+            <label class="field" id="starsField">
+              <span>Mindeststandard</span>
+              <select id="hotelStars">
+                <option value="2">2 Sterne</option>
+                <option value="3" selected>3 Sterne</option>
+                <option value="4">4 Sterne</option>
+                <option value="5">5 Sterne</option>
+              </select>
+            </label>
+          </div>
+          <p class="lodging-help" id="lodgingHelp">Hotel ist voreingestellt und beginnt bei 3 Sternen. Hostels erscheinen nur im eigenen Hostel-Reiter.</p>
+        </section>
+
+        <details class="advanced">
+          <summary>Weitere Optionen</summary>
+          <div class="advanced-grid">
+            <label class="check feeder-option"><input id="includeFlixtrain" type="checkbox" checked> FlixTrain</label>
+            <label class="check feeder-option"><input id="includeFlixbus" type="checkbox" checked> FlixBus</label>
+            <label class="check feeder-option"><input id="splitTicket" type="checkbox" checked> Split-Tickets prüfen</label>
+            <label class="check flight-option"><input id="destinationTransfer" type="checkbox" checked> Flughafen-Transfer</label>
+            <label class="field flight-option">
+              <span>Abflughafen IATA optional</span>
+              <input id="originAirports" placeholder="IATA-Codes, kommagetrennt">
+            </label>
+            <label class="field flight-option">
+              <span>Zielflughafen IATA optional</span>
+              <input id="destinationAirport" placeholder="IATA-Code" maxlength="3">
+            </label>
+            <label class="field flight-option feeder-option">
+              <span>Flughafenpuffer</span>
+              <select id="airportBuffer">
+                <option value="90">90 Minuten</option>
+                <option value="120" selected>120 Minuten</option>
+                <option value="150">150 Minuten</option>
+                <option value="180">180 Minuten</option>
+              </select>
+            </label>
+            <label class="field flight-option">
+              <span>Flugstopps</span>
+              <select id="stops">
+                <option value="any" selected>beliebig</option>
+                <option value="nonstop">nur direkt</option>
+                <option value="one_stop">max. 1 Stopp</option>
+              </select>
+            </label>
+          </div>
+        </details>
+
+        <div class="submit-row">
+          <button class="search-button" type="submit" id="searchButton">Verbindungen finden</button>
+          <label class="refresh"><input id="refreshCache" type="checkbox"> Live-Daten neu laden</label>
+        </div>
+      </form>
+    </section>
+
+    <section id="message" class="message hidden"></section>
+    <section id="results" class="results hidden"></section>
+  </main>
+
+    <footer class="project-credit" aria-label="Projektangaben">
+      <span>Entwickelt von lesecuritae</span>
+      <span aria-hidden="true">·</span>
+      <span>Mit Vibe-Coding-Unterstützung</span>
+      <span aria-hidden="true">·</span>
+      <span>Komplett ohne KI: eigenständiger, deterministischer Reisevergleich mit Split-Ticketing</span>
+      <span aria-hidden="true">·</span>
+      <a href="https://github.com/MikkoParkkola/trvl" target="_blank" rel="noreferrer">Nutzt trvl für ausgewählte Providerabfragen</a>
+    </footer>
+
+  <template id="feederTemplate">
+    <article class="result-card feeder-card">
+      <div class="card-head">
+        <div><span class="eyebrow"></span><h3></h3></div>
+        <span class="price-pill"></span>
+      </div>
+      <div class="variant-tabs"></div>
+      <div class="variant-content"></div>
+    </article>
+  </template>
+
+  <script src="/assets/app.js" defer></script>
+</body>
+</html>

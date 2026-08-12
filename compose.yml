@@ -1,0 +1,78 @@
+services:
+  db-api:
+    build:
+      context: ./db-api
+    container_name: fareweave-db-api
+    environment:
+      PORT: "3001"
+      USER_AGENT: fareweave/0.0.1
+      DB_CFFI_BRIDGE_URL: http://app:8000/internal/db-cffi/request
+      DB_CFFI_TOKEN: "${DB_CFFI_TOKEN:?DB_CFFI_TOKEN in .env setzen}"
+      DBNAV_MAX_CONCURRENCY: "2"
+      DBNAV_BLOCK_TTL_MS: "30000"
+      DB_REQUEST_TIMEOUT_MS: "18000"
+      DB_SPLIT_TIMEOUT_MS: "45000"
+      DB_SPLIT_REQUEST_TIMEOUT_MS: "12000"
+    networks:
+      - reisevergleich
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+
+  app:
+    build:
+      context: ./tool
+      args:
+        TRVL_REF: ${TRVL_REF:-v1.21.3}
+    container_name: fareweave-app
+    depends_on:
+      - db-api
+    environment:
+      TZ: Europe/Berlin
+      APP_TIMEZONE: Europe/Berlin
+      DB_API_URL: http://db-api:3001
+      DB_CFFI_TOKEN: "${DB_CFFI_TOKEN:?DB_CFFI_TOKEN in .env setzen}"
+      STAY22_API_KEY: ${STAY22_API_KEY:-}
+      REISE_CACHE_DB: /var/lib/reisevergleich/cache.sqlite3
+      FLIGHT_PROVIDER_TIMEOUT: "25"
+      FLIGHT_PROVIDER_CONCURRENCY: "3"
+      HOTEL_ENRICH_TIMEOUT: "35"
+      HOTEL_HEADLINE_TIMEOUT: "20"
+      HOTEL_STAY22_TIMEOUT: "15"
+      # trvl wartet sonst intern bis 18 s je Hotelprovider. Das lässt dem
+      # äußeren 20-s-Headline-Fallback keine Zeit zum Mergen/Serialisieren.
+      TRVL_PROVIDER_TIMEOUT: "8s"
+      GROUND_PROVIDER_TIMEOUT: "22"
+      GROUND_PROVIDER_CONCURRENCY: "2"
+      TRANSFER_PROVIDER_TIMEOUT: "20"
+      TRANSFER_PROVIDER_CONCURRENCY: "2"
+      TRANSITOUS_TIMEOUT: "25"
+      DB_SEARCH_TIMEOUT: "50"
+      DB_SPLIT_TIMEOUT: "45"
+      TRIP_TIMEOUT: "210"
+      TRVL_NO_TELEMETRY: "1"
+      NO_TELEMETRY: "1"
+      DO_NOT_TRACK: "1"
+      TRVL_DISABLE_UPDATE_CHECK: "1"
+      TRVL_NO_BROWSER_COOKIES: "1"
+      TRVL_NO_TIER2_CDP: "1"
+      TRVL_ALLOW_BROWSER_FALLBACKS: "false"
+      CI: "1"
+    volumes:
+      - fareweave-state:/var/lib/reisevergleich
+    ports:
+      - "${FAREWEAVE_BIND_HOST:-127.0.0.1}:${FAREWEAVE_PORT:-8791}:8000"
+    networks:
+      - reisevergleich
+    security_opt:
+      - no-new-privileges:true
+    shm_size: 256m
+    restart: unless-stopped
+
+networks:
+  reisevergleich:
+    name: fareweave-net
+
+volumes:
+  fareweave-state:
+    name: fareweave-state
