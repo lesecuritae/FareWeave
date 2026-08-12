@@ -14,15 +14,16 @@ jobs:
       - uses: actions/checkout@v6
         with:
           fetch-depth: 0
+      - name: Install ImageMagick
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq imagemagick
       - name: Convert README hero
         shell: bash
         run: |
           set -euo pipefail
           test -f docs/assets/readme-hero.webp
-          ffmpeg -hide_banner -loglevel error -y \
-            -i docs/assets/readme-hero.webp \
-            -frames:v 1 -q:v 2 \
-            docs/assets/readme-hero.jpg
+          convert docs/assets/readme-hero.webp -quality 92 docs/assets/readme-hero.jpg
           test -s docs/assets/readme-hero.jpg
           file docs/assets/readme-hero.jpg | grep -q 'JPEG image data'
           sed -i 's#docs/assets/readme-hero\.webp#docs/assets/readme-hero.jpg#g' README.md
