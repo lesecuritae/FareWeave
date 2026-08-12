@@ -1,0 +1,31 @@
+name: Import FareWeave source
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  import:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - name: Replace bootstrap with FareWeave 0.0.1
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat bootstrap/part-* | base64 -d > /tmp/fareweave.tgz
+          mkdir -p /tmp/fareweave
+          tar -xzf /tmp/fareweave.tgz -C /tmp/fareweave
+          find . -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
+          cp -a /tmp/fareweave/. .
+          sed -i 's/selbst gehosteter, Reisevergleich/selbst gehosteter Reisevergleich/' README.md
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Publish FareWeave 0.0.1"
+          git push origin HEAD:main
