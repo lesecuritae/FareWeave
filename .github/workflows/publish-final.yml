@@ -22,8 +22,6 @@ jobs:
           cat bootstrap/part-* | base64 -d > /tmp/fareweave.tgz
           mkdir -p /tmp/fareweave
 
-          # The old transport archive has a damaged gzip trailer, but its tar
-          # payload is recoverable. Ignore only the gzip trailer status here.
           set +e
           gzip -dc /tmp/fareweave.tgz > /tmp/fareweave.tar
           gzip_rc=$?
@@ -31,8 +29,7 @@ jobs:
           echo "gzip trailer status: $gzip_rc"
           tar -xf /tmp/fareweave.tar -C /tmp/fareweave
 
-          # Overlay the five files that were damaged in the old transport.
-          base64 -d bootstrap/repair5.b64 | tar -xzf - -C /tmp/fareweave
+          cat bootstrap/repair5.part-* | base64 -d | tar -xzf - -C /tmp/fareweave
 
           cd /tmp/fareweave
           sed 's#  \./#  #' "$GITHUB_WORKSPACE/bootstrap/expected.sha256" > /tmp/expected.sha256
