@@ -53,8 +53,12 @@ jobs:
           node --check tool/ui/app.js
 
           cd "$GITHUB_WORKSPACE"
+          cp -a .github/workflows /tmp/bootstrap-workflows
           find . -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
           cp -a /tmp/fareweave/. .
+          rm -rf .github/workflows
+          mkdir -p .github
+          cp -a /tmp/bootstrap-workflows .github/workflows
 
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
