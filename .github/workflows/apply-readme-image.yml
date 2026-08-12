@@ -18,38 +18,39 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          if [ ! -d tmp-readme-image ]; then
+            echo "Temporary image chunks already removed; nothing to do."
+            exit 0
+          fi
           python3 <<'PY'
           from pathlib import Path
+          import base64
           import hashlib
           import shutil
 
-          parts = [
-              'tmp-readme-image/part-00',
-              'tmp-readme-image/part-01-02',
-              'tmp-readme-image/part-03-04',
-              'tmp-readme-image/part-05-06',
-              'tmp-readme-image/part-07-08',
-              'tmp-readme-image/part-09-10',
-              'tmp-readme-image/part-11',
-          ]
-          payload = bytes.fromhex(''.join(Path(p).read_text().strip() for p in parts))
-          expected = 'b88485d87318488377a8a9fc6641d43d9f35eddc223c784a21797fb57bec888d'
+          parts = [Path('tmp-readme-image/base64-test2')]
+          parts += [Path(f'tmp-readme-image/b64-{i:02d}') for i in range(1, 12)]
+          encoded = ''.join(p.read_text(encoding='utf-8').strip() for p in parts)
+          payload = base64.b64decode(encoded, validate=True)
+
+          expected = 'cf92a16365ccfef9b2cf412cc78905ec4b20266c041b99d24566aec4122b6b8f'
           actual = hashlib.sha256(payload).hexdigest()
           if actual != expected:
               raise SystemExit(f'Hero image SHA256 mismatch: {actual}')
 
-          out = Path('docs/assets/readme-hero.jpg')
+          out = Path('docs/assets/readme-hero.webp')
           out.parent.mkdir(parents=True, exist_ok=True)
           out.write_bytes(payload)
 
           readme = Path('README.md')
           text = readme.read_text(encoding='utf-8')
-          text = text.replace('docs/assets/readme-hero.svg', 'docs/assets/readme-hero.jpg')
+          text = text.replace('docs/assets/readme-hero.svg', 'docs/assets/readme-hero.webp')
           readme.write_text(text, encoding='utf-8')
 
           old = Path('docs/assets/readme-hero.svg')
           if old.exists():
               old.unlink()
+
           shutil.rmtree('tmp-readme-image')
           print('Hero image SHA256:', actual)
           PY
