@@ -29,7 +29,19 @@ jobs:
           echo "gzip trailer status: $gzip_rc"
           tar -xf /tmp/fareweave.tar -C /tmp/fareweave
 
-          cat bootstrap/repair5.part-* | base64 -d | tar -xzf - -C /tmp/fareweave
+          cat \
+            bootstrap/repair5.part-00 \
+            bootstrap/repair5.part-01 \
+            bootstrap/repair5.part-02a \
+            bootstrap/repair5.part-02b \
+            bootstrap/repair5.part-02c \
+            bootstrap/repair5.part-03 \
+            bootstrap/repair5.part-04a \
+            bootstrap/repair5.part-04b1 \
+            bootstrap/repair5.part-04b2 \
+            bootstrap/repair5.part-04c \
+            bootstrap/repair5.part-05 \
+            | base64 -d | tar -xzf - -C /tmp/fareweave
 
           cd /tmp/fareweave
           sed 's#  \./#  #' "$GITHUB_WORKSPACE/bootstrap/expected.sha256" > /tmp/expected.sha256
