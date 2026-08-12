@@ -1,0 +1,54 @@
+name: Publish verified FareWeave source
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - name: Rebuild, verify and publish FareWeave 0.0.1
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          cat bootstrap/part-* | base64 -d > /tmp/fareweave.tgz
+          mkdir -p /tmp/fareweave
+
+          # The old transport archive has a damaged gzip trailer, but its tar
+          # payload is recoverable. Ignore only the gzip trailer status here.
+          set +e
+          gzip -dc /tmp/fareweave.tgz > /tmp/fareweave.tar
+          gzip_rc=$?
+          set -e
+          echo "gzip trailer status: $gzip_rc"
+          tar -xf /tmp/fareweave.tar -C /tmp/fareweave
+
+          # Overlay the five files that were damaged in the old transport.
+          base64 -d bootstrap/repair5.b64 | tar -xzf - -C /tmp/fareweave
+
+          cd /tmp/fareweave
+          sed 's#  \./#  #' "$GITHUB_WORKSPACE/bootstrap/expected.sha256" > /tmp/expected.sha256
+          sha256sum -c /tmp/expected.sha256
+
+          bash -n install.sh scripts/*.sh
+          python3 -m compileall -q tool tests
+          node --check db-api/server.mjs
+          node --check tool/ui/app.js
+
+          cd "$GITHUB_WORKSPACE"
+          find . -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
+          cp -a /tmp/fareweave/. .
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Publish FareWeave 0.0.1"
+          git push origin HEAD:main
