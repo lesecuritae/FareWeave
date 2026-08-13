@@ -238,66 +238,90 @@ Metadaten und fertige Statistiken liegen in der bestehenden `cache.sqlite3`. Es 
 keine zweite Datenbank und keine vollständige Datensatzkopie angelegt. Mit
 `HISTORY_ENABLED=false` ist die Schicht vollständig deaktiviert.
 
-## Installation
+## Installation mit Docker
 
-Voraussetzungen sind Docker und das Docker-Compose-Plugin. Der empfohlene Installationsweg verwendet die fertig veröffentlichten Images und baut nichts lokal:
+Voraussetzungen sind Docker, das Docker-Compose-Plugin, Git und OpenSSL. Der offizielle Installationsweg verwendet die fertig veröffentlichten GHCR-Images und baut nichts lokal:
 
 ```bash
 git clone https://github.com/lesecuritae/FareWeave.git
 cd FareWeave
-./install.sh
+
+cp .env.example .env
+
+TOKEN="$(openssl rand -hex 32)"
+sed -i "s/^DB_CFFI_TOKEN=.*/DB_CFFI_TOKEN=$TOKEN/" .env
+unset TOKEN
+
+docker compose config -q
+docker compose pull
+docker compose up -d --no-build
 ```
 
-Der Installer legt beim ersten Start eine `.env` an und erzeugt automatisch einen sicheren `DB_CFFI_TOKEN`. Eine bestehende `.env` wird nicht überschrieben. `DB_CFFI_TOKEN` ist kein Benutzerpasswort und kein FareWeave-Login, sondern ausschließlich das interne Secret für die Kommunikation zwischen `fareweave-app` und `fareweave-db-api`. Der normale Nutzer muss ihn nicht selbst erstellen.
+Danach prüfen:
 
-Verwendet werden diese fertigen Images:
+```bash
+docker compose ps
+curl http://127.0.0.1:8791/api/health
+```
+
+Die Oberfläche ist unter <http://127.0.0.1:8791> erreichbar.
+
+`DB_CFFI_TOKEN` ist für den Betrieb erforderlich, aber ausschließlich ein lokal zufällig erzeugtes internes Secret zwischen `fareweave-app` und `fareweave-db-api`. Er ist kein Benutzerpasswort und kein FareWeave-Login.
+
+**Der Stay22-API-Key ist optional.** FareWeave kann mit dem leeren Standardwert `STAY22_API_KEY=` installiert und betrieben werden. Nur Hotelprovider oder Funktionen, die tatsächlich einen Stay22-Key benötigen, stehen dann nicht oder nur eingeschränkt zur Verfügung; die übrigen Reisevergleichsfunktionen werden dadurch nicht blockiert.
+
+Die fertigen Images sind:
 
 ```text
 ghcr.io/lesecuritae/fareweave-app:latest
 ghcr.io/lesecuritae/fareweave-db-api:latest
 ```
 
-### Netzwerkzugriff
+Python, Go, Node.js, trvl und db-vendo-client müssen für die normale Installation nicht lokal gebaut werden. `install.sh` bleibt als optionale Komfortlösung verfügbar, ist aber keine Voraussetzung:
 
-Standardmäßig enthält `.env`:
-
-```env
-FAREWEAVE_BIND_HOST=127.0.0.1
-FAREWEAVE_PORT=8791
+```bash
+./install.sh
 ```
 
-Damit ist FareWeave nur auf dem Docker-Host unter <http://127.0.0.1:8791> erreichbar. Für Zugriff aus dem eigenen LAN kann bewusst Folgendes gesetzt werden:
+### LAN-Zugriff
+
+Standardmäßig lauscht FareWeave mit `FAREWEAVE_BIND_HOST=127.0.0.1` nur auf dem Docker-Host. Für Zugriff aus dem eigenen LAN in `.env` setzen:
 
 ```env
 FAREWEAVE_BIND_HOST=0.0.0.0
 ```
 
-Die Oberfläche ist danach unter `http://SERVER-IP:8791` erreichbar. `0.0.0.0` gibt den Dienst im erreichbaren Netzwerk frei; Firewall und gegebenenfalls Reverse Proxy sollten entsprechend konfiguriert werden.
+Danach neu anwenden:
 
-### Persistenz
+```bash
+docker compose up -d --no-build
+```
 
-FareWeave speichert seinen persistenten Zustand im Docker-Volume `fareweave-state`, das im App-Container unter `/var/lib/reisevergleich` eingebunden ist. `docker compose down` entfernt dieses Volume nicht. **`docker compose down -v` löscht dagegen das Volume und damit die persistenten FareWeave-Daten.**
+Die Oberfläche ist dann unter `http://SERVER-IP:8791` erreichbar. Mit `0.0.0.0` lauscht der Dienst im erreichbaren Netzwerk; Firewall und gegebenenfalls Reverse Proxy müssen entsprechend berücksichtigt werden.
 
 ### Betrieb
 
 ```bash
-# Start
-docker compose up -d --no-build
-
 # Status
 docker compose ps
-
-# Healthcheck
-curl http://127.0.0.1:8791/api/health
 
 # Logs
 docker compose logs -f app db-api
 
+# Neustart
+docker compose restart
+
 # Stoppen
 docker compose down
+
+# Starten
+docker compose up -d --no-build
+
+# Healthcheck
+curl http://127.0.0.1:8791/api/health
 ```
 
-Aktualisieren:
+### Aktualisieren
 
 ```bash
 git pull
@@ -305,29 +329,26 @@ docker compose pull
 docker compose up -d --no-build
 ```
 
-Ein eigener Stay22-Key kann optional als `STAY22_API_KEY` in `.env` hinterlegt werden. Ohne Key bleibt ein Ausfall oder Rate-Limit dieses Providers isoliert.
+Eine Neukompilierung ist nicht erforderlich.
 
-### Entwicklung / lokaler Build
+### Persistenz
 
-Der lokale Quellcode-Build ist für Entwicklung weiterhin möglich, aber nicht der empfohlene normale Installationsweg:
+FareWeave speichert den persistenten Zustand im Docker-Volume `fareweave-state`. Es ist im App-Container unter `/var/lib/reisevergleich` eingebunden. `docker compose down` erhält das Volume und seine Daten. **Warnung: `docker compose down -v` löscht das persistente Volume und damit die gespeicherten FareWeave-Daten.**
+
+## Entwicklung und lokaler Build
+
+Dieser Weg ist nur für Entwicklung gedacht und für normale Nutzer nicht erforderlich:
 
 ```bash
 cp .env.example .env
-sed -i "s/CHANGE_ME/$(openssl rand -hex 32)/" .env
+TOKEN="$(openssl rand -hex 32)"
+sed -i "s/^DB_CFFI_TOKEN=.*/DB_CFFI_TOKEN=$TOKEN/" .env
+unset TOKEN
 docker compose build
-bash scripts/container-check.sh
-docker compose run --rm --no-deps -e REISEVERGLEICH_SELF_TEST=1 db-api
 docker compose up -d
 ```
 
-trvl ist über genau ein Build-Argument gepinnt. FareWeave 0.0.1 verwendet standardmäßig `trvl v1.21.4`. Für einen späteren lokalen Build kann der Pin bewusst gesetzt werden:
-
-```bash
-TRVL_REF=v1.21.4 docker compose build app
-docker compose up -d app
-```
-
-Der Build leitet die interne Versionsnummer aus dem Tag ab und prüft die von FareWeave verwendeten Hotel-, Flug- und Ground-CLI-Verträge.
+trvl ist über `TRVL_REF` gepinnt; FareWeave 0.0.1 verwendet standardmäßig `v1.21.4`.
 
 ## Qualitätssicherung
 

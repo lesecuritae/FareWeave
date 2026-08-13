@@ -4,6 +4,8 @@ import os
 root = Path(os.environ.get("SOURCE_ROOT", Path(__file__).resolve().parents[1]))
 compose = (root / "compose.yml").read_text(encoding="utf-8")
 env_example = (root / ".env.example").read_text(encoding="utf-8")
+readme_de = (root / "README.de.md").read_text(encoding="utf-8")
+readme_en = (root / "README.en.md").read_text(encoding="utf-8")
 third_party = (root / "THIRD_PARTY.md").read_text(encoding="utf-8")
 check = (root / "scripts" / "check.sh").read_text(encoding="utf-8")
 container_check = (root / "scripts" / "container-check.sh").read_text(encoding="utf-8")
@@ -25,6 +27,16 @@ assert 'fareweave-state:/var/lib/reisevergleich' in compose
 assert '${DB_CFFI_TOKEN:?DB_CFFI_TOKEN in .env setzen}' in compose
 assert "DB_CFFI_TOKEN=CHANGE_ME" in env_example
 assert "STAY22_API_KEY=" in env_example
+assert "STAY22_API_KEY=\n" in env_example
+assert "STAY22_API_KEY=CHANGE_ME" not in env_example
+assert "ghcr.io/lesecuritae/fareweave-app:latest" in compose
+assert "ghcr.io/lesecuritae/fareweave-db-api:latest" in compose
+assert "## Installation mit Docker" in readme_de
+assert "## Installation with Docker" in readme_en
+assert "docker compose config -q" in readme_de and "docker compose config -q" in readme_en
+assert "docker compose up -d --no-build" in readme_de and "docker compose up -d --no-build" in readme_en
+assert "Stay22-API-Key ist optional" in readme_de
+assert "STAY22_API_KEY` is optional" in readme_en
 assert "PolyForm Noncommercial License 1.0.0" in third_party
 assert "Required Notice" in third_party
 assert "ISC License" in third_party
