@@ -205,15 +205,14 @@ anreichern. Die normale Suche, Preise und das Ranking bleiben davon unabhängig.
 Die Idee zur historischen Zuverlässigkeitsbewertung entstand unter anderem durch
 **Delay**. In unseren Tests erwies sich dessen Ansatz allerdings als wenig zuverlässig,
 weil die Abfragen regelmäßig mit Fehlern abbrachen. FareWeave setzt die Funktion deshalb
-eigenständig und passend zur eigenen Architektur um. Die benötigten historischen
-Zugdaten werden gezielt aus `piebro/deutsche-bahn-data` gefiltert und lokal gecacht.
-Bereits vorhandene Zug-/Monatsdaten müssen bei späteren Abfragen nicht erneut geladen
-werden.
+eigenständig um – einschließlich lokalem Cache und funktionierender Fallback-Logik.
 
-Die History-Auswertung läuft getrennt von der eigentlichen Reisesuche. Ist Hugging Face
-langsam, nicht erreichbar oder läuft der Abruf in ein Zeitlimit, bleibt die gefundene
-Verbindung trotzdem sichtbar. FareWeave zeigt dann vorübergehend keinen
-Zuverlässigkeitswert an, statt die komplette Suche mit einem 502-Fehler scheitern zu
+Die benötigten historischen Zugdaten werden gezielt aus `piebro/deutsche-bahn-data`
+gefiltert und lokal gespeichert. Bereits vorhandene Zug-/Monatsdaten müssen bei späteren
+Abfragen nicht erneut geladen werden. Schlägt ein Remote-Abruf fehl, ist Hugging Face
+langsam oder läuft die History-Abfrage in ein Zeitlimit, bleibt die eigentliche
+Reiseverbindung trotzdem erhalten. FareWeave fällt dann sauber auf eine Anzeige ohne
+Zuverlässigkeitswert zurück, statt die gesamte Suche mit einem 502-Fehler scheitern zu
 lassen.
 
 Der Prozentwert einer Direktfahrt bedeutet den empirisch beobachteten Anteil konkreter
