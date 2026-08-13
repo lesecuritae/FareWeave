@@ -2,7 +2,7 @@
 
 ![FareWeave – self-hosted travel comparison without AI](docs/assets/readme-hero.jpg)
 
-[Deutsch](README.md) | [English](README.en.md)
+[Start](README.md) | [Deutsch](README.de.md) | [English](README.en.md)
 
 **FareWeave is a self-hosted travel comparison service without AI, focused on journeys originating in Germany.**
 
