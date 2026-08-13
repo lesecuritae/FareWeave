@@ -2,6 +2,8 @@
 
 ![FareWeave – selbst gehosteter Reisevergleich ohne KI](docs/assets/readme-hero.jpg)
 
+[Deutsch](README.md) | [English](README.en.md)
+
 **FareWeave ist ein selbst gehosteter Reisevergleich ohne KI mit Fokus auf Reisen aus Deutschland.**
 
 Bahn, Deutschlandticket, Split-Tickets, FlixTrain, FlixBus, Flüge, Flughafenzubringer, Transfers und Unterkünfte landen in einer gemeinsamen Planung. FareWeave schaut dabei nicht nur, ob irgendwo ein günstiger Preis auftaucht. Die einzelnen Teile müssen zeitlich und logisch zusammenpassen.
