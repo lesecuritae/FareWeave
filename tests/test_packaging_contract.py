@@ -17,15 +17,17 @@ assert installer.is_file(), "install.sh fehlt"
 assert "docker compose pull" in installer_text
 assert "docker compose up -d --no-build --remove-orphans" in installer_text
 assert "docker compose build" not in installer_text
-assert 'sed -i "s/^DB_CFFI_TOKEN=.*/DB_CFFI_TOKEN=$token/" .env' in installer_text
+assert "interne Bridge-Token verwaltet Compose automatisch" in installer_text
 assert license_file.is_file(), "LICENSE fehlt"
 assert "MIT License" in license_file.read_text(encoding="utf-8")
 assert 'STAY22_API_KEY: ${STAY22_API_KEY:-}' in compose
 assert '${FAREWEAVE_BIND_HOST:-127.0.0.1}:${FAREWEAVE_PORT:-8791}:8000' in compose
 assert '0.0.0.0:8791:8000' not in compose
 assert 'fareweave-state:/var/lib/reisevergleich' in compose
-assert '${DB_CFFI_TOKEN:?DB_CFFI_TOKEN in .env setzen}' in compose
-assert "DB_CFFI_TOKEN=CHANGE_ME" in env_example
+assert "${DB_CFFI_TOKEN:-}" in compose
+assert "DB_CFFI_TOKEN_FILE: /run/fareweave-secrets/db_cffi_token" in compose
+assert "fareweave-secrets:/run/fareweave-secrets:ro" in compose
+assert "DB_CFFI_TOKEN=\n" in env_example
 assert "STAY22_API_KEY=" in env_example
 assert "STAY22_API_KEY=\n" in env_example
 assert "STAY22_API_KEY=CHANGE_ME" not in env_example

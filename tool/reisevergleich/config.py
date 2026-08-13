@@ -12,10 +12,10 @@ def _env_bool(name: str, default: bool) -> bool:
     if value is None:
         return default
     return value.strip().lower() in {"1", "true", "yes", "on"}
-APP_VERSION = "0.0.2"
+APP_VERSION = "0.0.3"
 DB_API_URL = os.getenv("DB_API_URL", "http://db-api:3001").rstrip("/")
 TRANSITOUS_URL = os.getenv("TRANSITOUS_URL", "https://api.transitous.org").rstrip("/")
-TRANSITOUS_USER_AGENT = os.getenv("TRANSITOUS_USER_AGENT", "fareweave/0.0.2")
+TRANSITOUS_USER_AGENT = os.getenv("TRANSITOUS_USER_AGENT", "fareweave/0.0.3")
 TRVL_BIN = os.getenv("TRVL_BIN", "trvl")
 
 # Harte Obergrenzen pro externer Quelle. Kein einzelner Anbieter darf die

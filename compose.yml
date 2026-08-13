@@ -1,4 +1,21 @@
 services:
+  secret-init:
+    image: ghcr.io/lesecuritae/fareweave-app:latest
+    build:
+      context: ./tool
+      args:
+        TRVL_REF: ${TRVL_REF:-v1.21.4}
+    command: ["python", "/app/init_db_cffi_token.py"]
+    user: "0:0"
+    environment:
+      DB_CFFI_TOKEN: "${DB_CFFI_TOKEN:-}"
+      DB_CFFI_TOKEN_FILE: /run/fareweave-secrets/db_cffi_token
+    volumes:
+      - fareweave-secrets:/run/fareweave-secrets
+    security_opt:
+      - no-new-privileges:true
+    restart: "no"
+
   db-api:
     image: ghcr.io/lesecuritae/fareweave-db-api:latest
     build:
@@ -6,9 +23,10 @@ services:
     container_name: fareweave-db-api
     environment:
       PORT: "3001"
-      USER_AGENT: fareweave/0.0.2
+      USER_AGENT: fareweave/0.0.3
       DB_CFFI_BRIDGE_URL: http://app:8000/internal/db-cffi/request
-      DB_CFFI_TOKEN: "${DB_CFFI_TOKEN:?DB_CFFI_TOKEN in .env setzen}"
+      DB_CFFI_TOKEN: "${DB_CFFI_TOKEN:-}"
+      DB_CFFI_TOKEN_FILE: /run/fareweave-secrets/db_cffi_token
       DBNAV_MAX_CONCURRENCY: "2"
       DBNAV_BLOCK_TTL_MS: "30000"
       DB_REQUEST_TIMEOUT_MS: "18000"
@@ -16,6 +34,13 @@ services:
       DB_SPLIT_REQUEST_TIMEOUT_MS: "12000"
     networks:
       - reisevergleich
+    volumes:
+      - fareweave-secrets:/run/fareweave-secrets:ro
+    group_add:
+      - "10001"
+    depends_on:
+      secret-init:
+        condition: service_completed_successfully
     security_opt:
       - no-new-privileges:true
     restart: unless-stopped
@@ -28,12 +53,16 @@ services:
         TRVL_REF: ${TRVL_REF:-v1.21.4}
     container_name: fareweave-app
     depends_on:
-      - db-api
+      secret-init:
+        condition: service_completed_successfully
+      db-api:
+        condition: service_started
     environment:
       TZ: Europe/Berlin
       APP_TIMEZONE: Europe/Berlin
       DB_API_URL: http://db-api:3001
-      DB_CFFI_TOKEN: "${DB_CFFI_TOKEN:?DB_CFFI_TOKEN in .env setzen}"
+      DB_CFFI_TOKEN: "${DB_CFFI_TOKEN:-}"
+      DB_CFFI_TOKEN_FILE: /run/fareweave-secrets/db_cffi_token
       STAY22_API_KEY: ${STAY22_API_KEY:-}
       REISE_CACHE_DB: /var/lib/reisevergleich/cache.sqlite3
       HISTORY_ENABLED: "${HISTORY_ENABLED:-true}"
@@ -69,6 +98,7 @@ services:
       CI: "1"
     volumes:
       - fareweave-state:/var/lib/reisevergleich
+      - fareweave-secrets:/run/fareweave-secrets:ro
     ports:
       - "${FAREWEAVE_BIND_HOST:-127.0.0.1}:${FAREWEAVE_PORT:-8791}:8000"
     networks:
@@ -85,3 +115,5 @@ networks:
 volumes:
   fareweave-state:
     name: fareweave-state
+  fareweave-secrets:
+    name: fareweave-secrets

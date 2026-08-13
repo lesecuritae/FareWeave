@@ -8,7 +8,7 @@
 
 Bahn, Deutschlandticket, Split-Tickets, FlixTrain, FlixBus, Flüge, Flughafenzubringer, Transfers und Unterkünfte landen in einer gemeinsamen Planung. FareWeave schaut dabei nicht nur, ob irgendwo ein günstiger Preis auftaucht. Die einzelnen Teile müssen zeitlich und logisch zusammenpassen.
 
-Aktuelle Version: **0.0.2**
+Aktuelle Version: **0.0.3**
 
 FareWeave verkauft und bucht selbst nichts. Wenn ein Provider einen brauchbaren Angebotslink liefert, kann er direkt aus dem Ergebnis geöffnet werden. Wo kein direkter Link vorhanden ist, gibt es an passenden Stellen einen manuellen Gegencheck, etwa bei der Deutschen Bahn, Google Flights, Google Hotels oder Google Maps. Preis und Verfügbarkeit werden beim eigentlichen Anbieter noch einmal geprüft.
 
@@ -96,11 +96,11 @@ trvl liefert an ausgewählten Stellen Daten. FareWeave entscheidet anschließend
 
 Die Flugabfragen laufen bewusst providerweise und mit eigenen Zeitlimits. Ein langsamer oder kaputter Provider soll nicht die komplette Reiseplanung blockieren.
 
-In FareWeave 0.0.2 werden zuerst **Skiplagged, Ryanair, Vueling und easyJet** abgefragt. Reichen die Ergebnisse nicht aus, folgen **Transavia, Norwegian, Air France/KLM und Wizz Air**.
+In FareWeave 0.0.3 werden zuerst **Skiplagged, Ryanair, Vueling und easyJet** abgefragt. Reichen die Ergebnisse nicht aus, folgen **Transavia, Norwegian, Air France/KLM und Wizz Air**.
 
 Die trvl-Sammelabfrage wird dafür nicht einfach unbeschränkt durchgereicht. FareWeave fragt die benötigten Provider isoliert ab, führt brauchbare Ergebnisse zusammen und verwirft chronologisch unplausible Flüge.
 
-Google Flights ist zusätzlich als manueller Gegencheck eingebaut. Es handelt sich in FareWeave 0.0.2 dabei **nicht um einen eigenen automatischen Google-Flights-Provider**, sondern um einen passenden Suchlink für die betreffende Strecke und die gewählten Reisedaten.
+Google Flights ist zusätzlich als manueller Gegencheck eingebaut. Es handelt sich in FareWeave 0.0.3 dabei **nicht um einen eigenen automatischen Google-Flights-Provider**, sondern um einen passenden Suchlink für die betreffende Strecke und die gewählten Reisedaten.
 
 ## Transfers und öffentlicher Verkehr
 
@@ -248,11 +248,7 @@ Voraussetzungen sind Docker, das Docker-Compose-Plugin, Git und OpenSSL. Der off
 git clone https://github.com/lesecuritae/FareWeave.git
 cd FareWeave
 
-cp .env.example .env
 
-TOKEN="$(openssl rand -hex 32)"
-sed -i "s/^DB_CFFI_TOKEN=.*/DB_CFFI_TOKEN=$TOKEN/" .env
-unset TOKEN
 
 docker compose config -q
 docker compose pull
@@ -268,7 +264,7 @@ curl http://127.0.0.1:8791/api/health
 
 Die Oberfläche ist unter <http://127.0.0.1:8791> erreichbar.
 
-`DB_CFFI_TOKEN` ist für den Betrieb erforderlich, aber ausschließlich ein lokal zufällig erzeugtes internes Secret zwischen `fareweave-app` und `fareweave-db-api`. Er ist kein Benutzerpasswort und kein FareWeave-Login.
+`DB_CFFI_TOKEN` ist optional; FareWeave erzeugt und persistiert standardmäßig selbst einen sicheren internen Token. Der Token ist ausschließlich ein lokal zufällig erzeugtes internes Secret zwischen `fareweave-app` und `fareweave-db-api`. Er ist kein Benutzerpasswort und kein FareWeave-Login.
 
 **Der Stay22-API-Key ist optional.** FareWeave kann mit dem leeren Standardwert `STAY22_API_KEY=` installiert und betrieben werden. Nur Hotelprovider oder Funktionen, die tatsächlich einen Stay22-Key benötigen, stehen dann nicht oder nur eingeschränkt zur Verfügung; die übrigen Reisevergleichsfunktionen werden dadurch nicht blockiert.
 
@@ -342,15 +338,11 @@ FareWeave speichert den persistenten Zustand im Docker-Volume `fareweave-state`.
 Dieser Weg ist nur für Entwicklung gedacht und für normale Nutzer nicht erforderlich:
 
 ```bash
-cp .env.example .env
-TOKEN="$(openssl rand -hex 32)"
-sed -i "s/^DB_CFFI_TOKEN=.*/DB_CFFI_TOKEN=$TOKEN/" .env
-unset TOKEN
 docker compose build
 docker compose up -d
 ```
 
-trvl ist über `TRVL_REF` gepinnt; FareWeave 0.0.2 verwendet standardmäßig `v1.21.4`.
+trvl ist über `TRVL_REF` gepinnt; FareWeave 0.0.3 verwendet standardmäßig `v1.21.4`.
 
 ## Qualitätssicherung
 

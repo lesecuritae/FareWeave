@@ -14,28 +14,12 @@ docker compose version >/dev/null 2>&1 || die "Docker Compose Plugin fehlt."
 if [[ ! -f .env ]]; then
   say "Konfiguration anlegen"
   cp .env.example .env
-  if command -v openssl >/dev/null 2>&1; then
-    token="$(openssl rand -hex 32)"
-  elif command -v python3 >/dev/null 2>&1; then
-    token="$(python3 - <<'PY'
-import secrets
-print(secrets.token_hex(32))
-PY
-)"
-  else
-    token="$(od -An -N32 -tx1 /dev/urandom | tr -d ' \n')"
-  fi
-  [[ "$token" =~ ^[0-9a-fA-F]{64}$ ]] || die "Sicherer DB_CFFI_TOKEN konnte nicht erzeugt werden."
-  sed -i "s/^DB_CFFI_TOKEN=.*/DB_CFFI_TOKEN=$token/" .env
   chmod 600 .env
-  echo ".env wurde mit zufälligem internem Bridge-Token angelegt."
+  echo ".env wurde angelegt; das interne Bridge-Token verwaltet Compose automatisch."
 else
   echo "Bestehende .env wird unverändert verwendet."
 fi
 
-if grep -Eq '^DB_CFFI_TOKEN=(CHANGE_ME)?$' .env; then
-  die "DB_CFFI_TOKEN in .env ist nicht gesetzt."
-fi
 
 say "Compose prüfen"
 docker compose config -q

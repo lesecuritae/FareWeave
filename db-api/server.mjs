@@ -1,18 +1,29 @@
 import crypto from 'node:crypto';
 import http from 'node:http';
 import {AsyncLocalStorage} from 'node:async_hooks';
+import {readFileSync} from 'node:fs';
 import {createClient} from './vendor/index.js';
 import {profile as dbProfile} from './vendor/p/db/index.js';
 import {profile as dbnavProfile} from './vendor/p/dbnav/index.js';
 
 const PORT = Number.parseInt(process.env.PORT || '3001', 10);
-const USER_AGENT = process.env.USER_AGENT || 'fareweave/0.0.2';
+const USER_AGENT = process.env.USER_AGENT || 'fareweave/0.0.3';
 const REQUEST_TIMEOUT_MS = Number.parseInt(process.env.DB_REQUEST_TIMEOUT_MS || '20000', 10);
 const SPLIT_TIMEOUT_MS = Number.parseInt(process.env.DB_SPLIT_TIMEOUT_MS || '75000', 10);
 const SPLIT_REQUEST_TIMEOUT_MS = Number.parseInt(process.env.DB_SPLIT_REQUEST_TIMEOUT_MS || '15000', 10);
 const CACHE_TTL_MS = 15 * 60 * 1000;
 const CFFI_BRIDGE_URL = process.env.DB_CFFI_BRIDGE_URL || 'http://app:8000/internal/db-cffi/request';
-const CFFI_TOKEN = process.env.DB_CFFI_TOKEN || '';
+function readCffiToken() {
+  const explicit = process.env.DB_CFFI_TOKEN || '';
+  if (explicit) { if (explicit.trim() !== explicit || /\s/.test(explicit)) throw new Error('DB_CFFI_TOKEN is invalid'); return explicit; }
+  const filename = (process.env.DB_CFFI_TOKEN_FILE || '').trim();
+  if (!filename) throw new Error('DB_CFFI_TOKEN or DB_CFFI_TOKEN_FILE is required');
+  let token;
+  try { token = readFileSync(filename, 'utf8').trim(); } catch (error) { throw new Error('DB_CFFI_TOKEN_FILE cannot be read', {cause: error}); }
+  if (!/^[0-9a-fA-F]{64}$/.test(token)) throw new Error('DB_CFFI_TOKEN_FILE contains an invalid token');
+  return token;
+}
+const CFFI_TOKEN = readCffiToken();
 const cffiSessionStorage = new AsyncLocalStorage();
 const DBNAV_BLOCK_TTL_MS = Number.parseInt(process.env.DBNAV_BLOCK_TTL_MS || '30000', 10);
 const DBNAV_MAX_CONCURRENCY = Math.max(1, Number.parseInt(process.env.DBNAV_MAX_CONCURRENCY || '2', 10));

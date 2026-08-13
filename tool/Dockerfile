@@ -32,6 +32,7 @@ COPY requirements.txt ./requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 COPY --chown=reisevergleich:reisevergleich app.py ./app.py
 COPY --chown=reisevergleich:reisevergleich db_cffi_bridge.py ./db_cffi_bridge.py
+COPY init_db_cffi_token.py ./init_db_cffi_token.py
 COPY --chown=reisevergleich:reisevergleich reisevergleich ./reisevergleich
 COPY --chown=reisevergleich:reisevergleich ui ./ui
 USER reisevergleich

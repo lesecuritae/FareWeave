@@ -8,7 +8,7 @@
 
 Rail, the Deutschlandticket, split tickets, FlixTrain, FlixBus, flights, airport feeders, transfers, and accommodation are combined into a single itinerary. FareWeave does not merely look for a low price somewhere. Every part of the journey must fit together both chronologically and logically.
 
-Current version: **0.0.2**
+Current version: **0.0.3**
 
 FareWeave does not sell or book anything itself. If a provider supplies a usable offer link, it can be opened directly from the result. Where no direct link is available, FareWeave offers a suitable manual cross-check, for example with Deutsche Bahn, Google Flights, Google Hotels, or Google Maps. Price and availability must always be verified with the actual provider.
 
@@ -96,11 +96,11 @@ trvl supplies data in selected places. FareWeave then applies deterministic rule
 
 Flight providers are queried separately and have their own time limits. A slow or broken provider must not block the entire journey plan.
 
-FareWeave 0.0.2 first queries **Skiplagged, Ryanair, Vueling, and easyJet**. If those results are insufficient, it continues with **Transavia, Norwegian, Air France/KLM, and Wizz Air**.
+FareWeave 0.0.3 first queries **Skiplagged, Ryanair, Vueling, and easyJet**. If those results are insufficient, it continues with **Transavia, Norwegian, Air France/KLM, and Wizz Air**.
 
 The aggregated trvl request is not passed through without limits. FareWeave queries the required providers in isolation, combines usable results, and rejects chronologically implausible flights.
 
-Google Flights is also included as a manual cross-check. In FareWeave 0.0.2 it is **not a separate automated Google Flights provider**, but a suitable search link for the requested route and travel dates.
+Google Flights is also included as a manual cross-check. In FareWeave 0.0.3 it is **not a separate automated Google Flights provider**, but a suitable search link for the requested route and travel dates.
 
 ## Transfers and public transport
 
@@ -248,11 +248,7 @@ Docker, the Docker Compose plugin, Git, and OpenSSL are required. The official i
 git clone https://github.com/lesecuritae/FareWeave.git
 cd FareWeave
 
-cp .env.example .env
 
-TOKEN="$(openssl rand -hex 32)"
-sed -i "s/^DB_CFFI_TOKEN=.*/DB_CFFI_TOKEN=$TOKEN/" .env
-unset TOKEN
 
 docker compose config -q
 docker compose pull
@@ -268,7 +264,7 @@ curl http://127.0.0.1:8791/api/health
 
 The interface is available at <http://127.0.0.1:8791>.
 
-`DB_CFFI_TOKEN` is required at runtime, but it is only a locally generated internal secret between `fareweave-app` and `fareweave-db-api`. It is not a user password or FareWeave login.
+`DB_CFFI_TOKEN` is optional; FareWeave securely generates and persists an internal token by default. The token is only a locally generated internal secret between `fareweave-app` and `fareweave-db-api`. It is not a user password or FareWeave login.
 
 **`STAY22_API_KEY` is optional.** FareWeave installs and runs with the empty default `STAY22_API_KEY=`. Only hotel providers or features that actually require a Stay22 key may be unavailable or limited; the remaining travel-comparison features are not blocked.
 
@@ -342,15 +338,11 @@ FareWeave stores persistent state in the Docker volume `fareweave-state`, mounte
 This path is intended only for development and is not required for normal users:
 
 ```bash
-cp .env.example .env
-TOKEN="$(openssl rand -hex 32)"
-sed -i "s/^DB_CFFI_TOKEN=.*/DB_CFFI_TOKEN=$TOKEN/" .env
-unset TOKEN
 docker compose build
 docker compose up -d
 ```
 
-trvl is pinned through `TRVL_REF`; FareWeave 0.0.2 uses `v1.21.4` by default.
+trvl is pinned through `TRVL_REF`; FareWeave 0.0.3 uses `v1.21.4` by default.
 
 ## Quality assurance
 

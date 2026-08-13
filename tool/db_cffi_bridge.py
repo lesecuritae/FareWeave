@@ -16,10 +16,12 @@ from curl_cffi.requests.impersonate import BrowserType
 from fastapi import APIRouter, Header, HTTPException
 from pydantic import BaseModel, Field
 
+from reisevergleich.internal_secret import read_internal_token
+
 router = APIRouter()
 
 _ALLOWED_HOSTS = {"app.services-bahn.de", "int.bahn.de", "www.bahn.de"}
-_TOKEN = os.environ.get("DB_CFFI_TOKEN", "")
+_TOKEN = read_internal_token()
 _DEFAULT_FIREFOX_POOL = ("firefox133", "firefox135", "firefox144", "firefox147")
 _ROTATE_STATUSES = {403, 429}
 _SESSION_TTL_SECONDS = max(60, min(int(os.environ.get("DB_CFFI_SESSION_TTL", "900")), 3600))

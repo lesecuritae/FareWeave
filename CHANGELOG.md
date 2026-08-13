@@ -1,4 +1,11 @@
 # Changelog
+## 0.0.3 - 2026-08-14
+
+- Direkte Docker-/Compose-Installationen benötigen keinen manuell gesetzten `DB_CFFI_TOKEN` mehr.
+- Der interne Bridge-Token wird kryptographisch sicher erzeugt und im privaten Docker-Volume `fareweave-secrets` persistent gespeichert.
+- Bestehende explizite `DB_CFFI_TOKEN`-Konfigurationen bleiben kompatibel und haben Vorrang.
+- `curl_cffi` bleibt vollständig im App-Image enthalten.
+
 
 ## 0.0.2 - 2026-08-14
 
