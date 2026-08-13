@@ -56,10 +56,8 @@ run(){
   fi
 }
 
-run "Images bauen" docker compose build
-run "Regressionen im App-Image" bash scripts/container-check.sh
-run "DB-Backend-Selbsttests" docker compose run --rm --no-deps -e REISEVERGLEICH_SELF_TEST=1 db-api
-run "Dienste starten" docker compose up -d --remove-orphans
+run "Veröffentlichte Images laden" docker compose pull
+run "Dienste starten" docker compose up -d --no-build --remove-orphans
 
 printf '%-52s' "Healthcheck"
 ok=0

@@ -238,41 +238,78 @@ Metadaten und fertige Statistiken liegen in der bestehenden `cache.sqlite3`. Es 
 keine zweite Datenbank und keine vollständige Datensatzkopie angelegt. Mit
 `HISTORY_ENABLED=false` ist die Schicht vollständig deaktiviert.
 
-## Lokaler Start
+## Installation
 
-Voraussetzungen sind Docker und das Docker-Compose-Plugin. Der Installer legt beim ersten Start eine `.env` mit zufälligem internem Bridge-Token an, baut beide Images und führt die Container-Regressionen sowie die DB-Selbsttests aus.
-
-### Fertige Docker-Images
+Voraussetzungen sind Docker und das Docker-Compose-Plugin. Der empfohlene Installationsweg verwendet die fertig veröffentlichten Images und baut nichts lokal:
 
 ```bash
-docker pull ghcr.io/lesecuritae/fareweave-app:latest
-docker pull ghcr.io/lesecuritae/fareweave-db-api:latest
-```
-
-Für die normale Installation verwendet Docker Compose standardmäßig diese fertigen Images:
-
-```bash
-cp .env.example .env
-sed -i "s/CHANGE_ME/$(openssl rand -hex 32)/" .env
-docker compose up -d
-```
-
-Der lokale Quellcode-Build bleibt weiterhin möglich:
-
-```bash
-chmod +x install.sh
+git clone https://github.com/lesecuritae/FareWeave.git
+cd FareWeave
 ./install.sh
 ```
 
-Die Oberfläche ist standardmäßig ausschließlich lokal unter <http://127.0.0.1:8791> erreichbar. Der Healthcheck liegt unter <http://127.0.0.1:8791/api/health>.
+Der Installer legt beim ersten Start eine `.env` an und erzeugt automatisch einen sicheren `DB_CFFI_TOKEN`. Eine bestehende `.env` wird nicht überschrieben. `DB_CFFI_TOKEN` ist kein Benutzerpasswort und kein FareWeave-Login, sondern ausschließlich das interne Secret für die Kommunikation zwischen `fareweave-app` und `fareweave-db-api`. Der normale Nutzer muss ihn nicht selbst erstellen.
 
-Wer FareWeave bewusst im LAN veröffentlichen möchte, kann in `.env` setzen:
+Verwendet werden diese fertigen Images:
+
+```text
+ghcr.io/lesecuritae/fareweave-app:latest
+ghcr.io/lesecuritae/fareweave-db-api:latest
+```
+
+### Netzwerkzugriff
+
+Standardmäßig enthält `.env`:
+
+```env
+FAREWEAVE_BIND_HOST=127.0.0.1
+FAREWEAVE_PORT=8791
+```
+
+Damit ist FareWeave nur auf dem Docker-Host unter <http://127.0.0.1:8791> erreichbar. Für Zugriff aus dem eigenen LAN kann bewusst Folgendes gesetzt werden:
 
 ```env
 FAREWEAVE_BIND_HOST=0.0.0.0
 ```
 
-### Manuelle Installation
+Die Oberfläche ist danach unter `http://SERVER-IP:8791` erreichbar. `0.0.0.0` gibt den Dienst im erreichbaren Netzwerk frei; Firewall und gegebenenfalls Reverse Proxy sollten entsprechend konfiguriert werden.
+
+### Persistenz
+
+FareWeave speichert seinen persistenten Zustand im Docker-Volume `fareweave-state`, das im App-Container unter `/var/lib/reisevergleich` eingebunden ist. `docker compose down` entfernt dieses Volume nicht. **`docker compose down -v` löscht dagegen das Volume und damit die persistenten FareWeave-Daten.**
+
+### Betrieb
+
+```bash
+# Start
+docker compose up -d --no-build
+
+# Status
+docker compose ps
+
+# Healthcheck
+curl http://127.0.0.1:8791/api/health
+
+# Logs
+docker compose logs -f app db-api
+
+# Stoppen
+docker compose down
+```
+
+Aktualisieren:
+
+```bash
+git pull
+docker compose pull
+docker compose up -d --no-build
+```
+
+Ein eigener Stay22-Key kann optional als `STAY22_API_KEY` in `.env` hinterlegt werden. Ohne Key bleibt ein Ausfall oder Rate-Limit dieses Providers isoliert.
+
+### Entwicklung / lokaler Build
+
+Der lokale Quellcode-Build ist für Entwicklung weiterhin möglich, aber nicht der empfohlene normale Installationsweg:
 
 ```bash
 cp .env.example .env
@@ -283,20 +320,14 @@ docker compose run --rm --no-deps -e REISEVERGLEICH_SELF_TEST=1 db-api
 docker compose up -d
 ```
 
-Ein eigener Stay22-Key kann optional als `STAY22_API_KEY` in `.env` hinterlegt werden. Ohne Key bleibt ein Ausfall oder Rate-Limit dieses Providers isoliert.
-
-### trvl aktualisieren
-
-trvl ist über genau ein Build-Argument gepinnt. FareWeave 0.0.1 verwendet standardmäßig `trvl v1.21.4`.
-
-Für einen späteren veröffentlichten Versionstag kann beispielsweise neu gebaut werden:
+trvl ist über genau ein Build-Argument gepinnt. FareWeave 0.0.1 verwendet standardmäßig `trvl v1.21.4`. Für einen späteren lokalen Build kann der Pin bewusst gesetzt werden:
 
 ```bash
 TRVL_REF=v1.21.4 docker compose build app
 docker compose up -d app
 ```
 
-Der Build leitet die interne Versionsnummer aus dem Tag ab und prüft die von FareWeave verwendeten Hotel-, Flug- und Ground-CLI-Verträge. Ein inkompatibles trvl-Release soll dadurch nicht stillschweigend übernommen werden.
+Der Build leitet die interne Versionsnummer aus dem Tag ab und prüft die von FareWeave verwendeten Hotel-, Flug- und Ground-CLI-Verträge.
 
 ## Qualitätssicherung
 

@@ -8,9 +8,14 @@ third_party = (root / "THIRD_PARTY.md").read_text(encoding="utf-8")
 check = (root / "scripts" / "check.sh").read_text(encoding="utf-8")
 container_check = (root / "scripts" / "container-check.sh").read_text(encoding="utf-8")
 installer = root / "install.sh"
+installer_text = installer.read_text(encoding="utf-8")
 license_file = root / "LICENSE"
 
 assert installer.is_file(), "install.sh fehlt"
+assert "docker compose pull" in installer_text
+assert "docker compose up -d --no-build --remove-orphans" in installer_text
+assert "docker compose build" not in installer_text
+assert 'sed -i "s/^DB_CFFI_TOKEN=.*/DB_CFFI_TOKEN=$token/" .env' in installer_text
 assert license_file.is_file(), "LICENSE fehlt"
 assert "MIT License" in license_file.read_text(encoding="utf-8")
 assert 'STAY22_API_KEY: ${STAY22_API_KEY:-}' in compose
