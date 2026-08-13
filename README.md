@@ -292,6 +292,28 @@ Die Prüfkette umfasst unter anderem Python-, Node- und Shell-Syntax, API- und U
 
 Live-Tests benötigen erreichbare externe Provider und werden getrennt von den reproduzierbaren Regressionstests ausgeführt.
 
+## Roadmap
+
+### Coming soon: eigene Provider statt trvl
+
+Der nächste größere Schritt ist bereits geplant: **trvl soll schrittweise vollständig aus FareWeave verschwinden.**
+
+Flug-, Unterkunfts- und weitere Provider, die heute noch über trvl angebunden sind, sollen künftig direkt von FareWeave abgefragt werden. Die vorhandene FareWeave-Logik für Provider-Isolation, Zeitlimits, Fallbacks, Plausibilitätsprüfungen, Preisvergleich und Caching bleibt dabei erhalten und wird direkt mit eigenen Provider-Modulen verbunden.
+
+Ein wichtiger Baustein dafür ist `curl_cffi`, das FareWeave bereits für schwierige HTTP-Abfragen einsetzt. Damit lassen sich Browser-TLS- und HTTP-Fingerprints wesentlich genauer nachbilden als mit klassischen Python-HTTP-Clients. Das schafft bei manchen Anbietern zusätzliche Möglichkeiten für stabile Direktabfragen und providerbezogene Fallbacks.
+
+Das Ziel ist ein FareWeave-Stack ohne externes trvl-Binary:
+
+* direkte FareWeave-Provider für Flüge
+* direkte FareWeave-Provider für Unterkünfte und weitere Reisebausteine
+* eigene Normalisierung und Fehlerbehandlung
+* eigene Cache- und Fallback-Strategien
+* keine trvl-Build-Abhängigkeit mehr
+
+Dabei geht es nicht darum, Schutzmechanismen um jeden Preis zu umgehen. Wenn ein Anbieter keine zuverlässig nutzbare Schnittstelle bietet, soll FareWeave das weiterhin transparent anzeigen und andere Provider weiterlaufen lassen.
+
+**Coming soon.**
+
 ## Bekannte Grenzen
 
 FareWeave kann nur so aktuelle Daten liefern, wie die jeweiligen externen Provider sie bereitstellen. Anbieter können Schnittstellen ändern, Anfragen blockieren, Preise verändern oder zeitweise gar keine verwertbaren Ergebnisse liefern.

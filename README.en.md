@@ -302,6 +302,28 @@ split tickets; provider isolation; transfers; hotels; and flight chronology.
 Live tests require reachable external providers and run separately from reproducible
 regression tests.
 
+## Roadmap
+
+### Coming soon: native providers instead of trvl
+
+The next major step is already planned: **trvl will gradually be removed from FareWeave entirely.**
+
+Flight, accommodation, and other providers that are still connected through trvl today are planned to be queried directly by FareWeave. The existing FareWeave logic for provider isolation, timeouts, fallbacks, plausibility checks, price comparison, and caching will remain and connect directly to native provider modules.
+
+An important building block for this is `curl_cffi`, which FareWeave already uses for difficult HTTP requests. It can reproduce browser TLS and HTTP fingerprints much more closely than conventional Python HTTP clients, giving FareWeave additional options for stable direct requests and provider-specific fallback paths where appropriate.
+
+The goal is a FareWeave stack without an external trvl binary:
+
+* native FareWeave flight providers
+* native FareWeave providers for accommodation and additional travel components
+* FareWeave-owned normalization and error handling
+* FareWeave-owned caching and fallback strategies
+* no remaining trvl build dependency
+
+The goal is not to bypass protection mechanisms at any cost. If a provider does not expose an interface that can be used reliably, FareWeave should continue to report that transparently while allowing other providers to keep working.
+
+**Coming soon.**
+
 ## Known limitations
 
 FareWeave can only be as current as its external providers. Providers may change
