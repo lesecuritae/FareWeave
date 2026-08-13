@@ -34,6 +34,11 @@ Dataset-Repositories.
 
 [Transitous](https://github.com/public-transport/transitous) wird als externe Routingquelle für öffentlichen Verkehr und Transfers verwendet. [BetterBahn](https://github.com/BetterBahn/betterbahn) wird in der README als ursprüngliche Motivation für das integrierte Split-Ticketing genannt; FareWeave übernimmt keinen BetterBahn-Code. Stay22 wird als externer Unterkunftsdienst eingebunden und ist keine mitgelieferte Open-Source-Bibliothek dieses Repositories.
 
+**Delay** gab die Anregung, historische Verspätungsdaten bei der Bewertung konkreter
+Verbindungen einzubeziehen. Delay ist keine Datenquelle oder Abhängigkeit von FareWeave.
+Die historischen Daten stammen aus `piebro/deutsche-bahn-data`; Filterung, Berechnung und
+lokaler Zug-/Monatscache sind eine eigenständige FareWeave-Implementierung.
+
 ## Direkte Python-Abhängigkeiten
 
 Die direkt in `tool/requirements.txt` deklarierten Python-Pakete behalten ihre jeweiligen Upstream-Lizenzen. Dazu gehören FastAPI, HTTPX, Pydantic, Uvicorn, `curl_cffi` und DuckDB. Die tatsächlich installierten Versionen ergeben sich aus den dort definierten Versionsgrenzen; `curl_cffi` ist auf `0.16.0` gepinnt.
