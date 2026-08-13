@@ -6,14 +6,18 @@ import os
 import re
 import tempfile
 import threading
-import urllib.request
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from curl_cffi import requests as curl_requests
+
 from . import cache
-from .config import HISTORY_CACHE_DIR, HISTORY_CACHE_MAX_GB, HISTORY_REMOTE_TIMEOUT, HISTORY_SOURCE_REVISION
+from .config import (
+    HISTORY_CACHE_DIR, HISTORY_CACHE_MAX_GB, HISTORY_MAX_CONCURRENCY,
+    HISTORY_REMOTE_TIMEOUT, HISTORY_SOURCE_REVISION,
+)
 
 SOURCE = "piebro/deutsche-bahn-data"
 DETAIL_SCHEMA = 1
@@ -28,6 +32,7 @@ _locks: dict[str, asyncio.Lock] = {}
 _active: set[str] = set()
 _reading: set[str] = set()
 _guard = threading.Lock()
+_remote_fill_limiter = threading.BoundedSemaphore(max(1, HISTORY_MAX_CONCURRENCY))
 
 
 @dataclass(frozen=True)
@@ -123,10 +128,21 @@ def _download_month(url: str, directory: Path) -> Path:
     fd, name = tempfile.mkstemp(prefix="history-month-", suffix=".parquet", dir=directory)
     os.close(fd)
     path = Path(name)
+    response = None
     try:
-        request = urllib.request.Request(url, headers={"User-Agent": "FareWeave/0.0.1"})
-        with urllib.request.urlopen(request, timeout=HISTORY_REMOTE_TIMEOUT) as response, path.open("wb") as output:
-            while chunk := response.read(1024 * 1024):
+        response = curl_requests.get(
+            url,
+            headers={"User-Agent": "FareWeave/0.0.1"},
+            impersonate="firefox",
+            timeout=HISTORY_REMOTE_TIMEOUT,
+            allow_redirects=True,
+            stream=True,
+        )
+        response.raise_for_status()
+        with path.open("wb") as output:
+            for chunk in response.iter_content(chunk_size=1024 * 1024):
+                if not chunk:
+                    continue
                 output.write(chunk)
             output.flush()
             os.fsync(output.fileno())
@@ -134,6 +150,9 @@ def _download_month(url: str, directory: Path) -> Path:
     except Exception:
         path.unlink(missing_ok=True)
         raise
+    finally:
+        if response is not None:
+            response.close()
 
 
 def query_remote_month(spec: DetailSpec, target: Path) -> tuple[int, str]:
@@ -148,7 +167,7 @@ def query_remote_month(spec: DetailSpec, target: Path) -> tuple[int, str]:
     downloaded: Path | None = None
     try:
         downloaded = _download_month(https_url, target.parent)
-        return _copy_filtered(str(downloaded), target, spec), "download_fallback"
+        return _copy_filtered(str(downloaded), target, spec), "curl_cffi_download_fallback"
     except Exception as exc:
         errors.append(f"{type(exc).__name__}: {exc}")
         raise RuntimeError("history_source_unreachable: " + " | ".join(errors)[-1500:]) from exc
@@ -165,7 +184,8 @@ def _write_detail(spec: DetailSpec) -> Path:
     temporary = target.with_name(f".{target.name}.{os.getpid()}.{threading.get_ident()}.tmp.parquet")
     temporary.unlink(missing_ok=True)
     try:
-        row_count, method = query_remote_month(spec, temporary)
+        with _remote_fill_limiter:
+            row_count, method = query_remote_month(spec, temporary)
         with temporary.open("rb") as handle:
             os.fsync(handle.fileno())
         os.replace(temporary, target)
