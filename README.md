@@ -202,13 +202,19 @@ FareWeave kann gefundene Bahn-Legs additiv mit 90 Tagen historischer Beobachtung
 [`piebro/deutsche-bahn-data`](https://huggingface.co/datasets/piebro/deutsche-bahn-data)
 anreichern. Die normale Suche, Preise und das Ranking bleiben davon unabhängig.
 
-Vielen Dank an **Delay** für die Anregung, historische Verspätungsdaten direkt bei der
-Bewertung einer Verbindung zu berücksichtigen. FareWeave setzt diese Idee eigenständig
-und passend zur eigenen Architektur um. `piebro/deutsche-bahn-data` bleibt dabei die
-historische Datenquelle; Filterung, Berechnung und Cache-Logik stammen aus FareWeave.
-Statt bei jeder Suche erneut größere Datenmengen abzurufen, werden nur die benötigten
-Zug-/Monatsdaten gefiltert und lokal gespeichert. Bereits ausgewertete Daten müssen bei
-späteren Abfragen deshalb nicht erneut aus dem Remote-Datensatz geladen werden.
+Die Idee zur historischen Zuverlässigkeitsbewertung entstand unter anderem durch
+**Delay**. In unseren Tests erwies sich dessen Ansatz allerdings als wenig zuverlässig,
+weil die Abfragen regelmäßig mit Fehlern abbrachen. FareWeave setzt die Funktion deshalb
+eigenständig und passend zur eigenen Architektur um. Die benötigten historischen
+Zugdaten werden gezielt aus `piebro/deutsche-bahn-data` gefiltert und lokal gecacht.
+Bereits vorhandene Zug-/Monatsdaten müssen bei späteren Abfragen nicht erneut geladen
+werden.
+
+Die History-Auswertung läuft getrennt von der eigentlichen Reisesuche. Ist Hugging Face
+langsam, nicht erreichbar oder läuft der Abruf in ein Zeitlimit, bleibt die gefundene
+Verbindung trotzdem sichtbar. FareWeave zeigt dann vorübergehend keinen
+Zuverlässigkeitswert an, statt die komplette Suche mit einem 502-Fehler scheitern zu
+lassen.
 
 Der Prozentwert einer Direktfahrt bedeutet den empirisch beobachteten Anteil konkreter
 Fahrtinstanzen, die **nicht explizit ausgefallen sind und ihr Ziel mit höchstens zehn
