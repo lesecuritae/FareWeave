@@ -244,6 +244,23 @@ Docker and the Docker Compose plugin are required. On first launch, the installe
 a `.env` containing a random internal bridge token, builds both images, and runs the
 container regressions and DB self-tests.
 
+### Ready-made Docker images
+
+```bash
+docker pull ghcr.io/lesecuritae/fareweave-app:latest
+docker pull ghcr.io/lesecuritae/fareweave-db-api:latest
+```
+
+For a normal installation, Docker Compose uses these ready-made images by default:
+
+```bash
+cp .env.example .env
+sed -i "s/CHANGE_ME/$(openssl rand -hex 32)/" .env
+docker compose up -d
+```
+
+Building locally from the source remains available:
+
 ```bash
 chmod +x install.sh
 ./install.sh
@@ -275,7 +292,7 @@ a provider failure or rate limit remains isolated.
 ### Updating trvl
 
 trvl is pinned through exactly one build argument. FareWeave 0.0.1 uses
-`trvl v1.21.3` by default.
+`trvl v1.21.4` by default.
 
 For a later published version tag, rebuild it as follows:
 
@@ -367,7 +384,7 @@ trademarks and names.
 FareWeave code originating from this repository is available under the
 [MIT License](LICENSE).
 
-Third parties retain their own licences. Of particular importance is `trvl v1.21.3`,
+Third parties retain their own licences. Of particular importance is `trvl v1.21.4`,
 which is licensed under the **PolyForm Noncommercial License 1.0.0**. FareWeave's MIT
 licence does not override trvl's non-commercial restriction. Anyone wishing to use the
 complete default stack commercially must review trvl's licence terms separately.

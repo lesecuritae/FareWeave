@@ -1,5 +1,6 @@
 services:
   db-api:
+    image: ghcr.io/lesecuritae/fareweave-db-api:latest
     build:
       context: ./db-api
     container_name: fareweave-db-api
@@ -20,10 +21,11 @@ services:
     restart: unless-stopped
 
   app:
+    image: ghcr.io/lesecuritae/fareweave-app:latest
     build:
       context: ./tool
       args:
-        TRVL_REF: ${TRVL_REF:-v1.21.3}
+        TRVL_REF: ${TRVL_REF:-v1.21.4}
     container_name: fareweave-app
     depends_on:
       - db-api

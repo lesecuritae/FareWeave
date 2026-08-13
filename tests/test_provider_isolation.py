@@ -88,6 +88,17 @@ def fake_run_json(command: list[str], timeout: int):
     raise AssertionError(command)
 
 
+def fake_flix_routes(command: list[str], timeout: int):
+    return {
+        "ok": True,
+        "data": {"routes": [
+            {"provider": "flixbus", "type": "bus", "departure": {"city": "Frankfurt", "time": f"{future}T09:00:00+02:00"}, "arrival": {"city": "Berlin", "time": f"{future}T17:00:00+02:00"}, "duration_minutes": 480, "price": 19.99, "currency": "EUR"},
+            {"provider": "flixbus", "type": "bus", "departure": {"city": "Frankfurt", "time": f"{future}T10:00:00+02:00"}, "arrival": {"city": "Cologne", "time": f"{future}T12:30:00+02:00"}, "duration_minutes": 150, "price": 24.99, "currency": "EUR"},
+        ]},
+        "raw": {"code": 0, "command": command},
+    }
+
+
 async def main():
     original = trvl.run_json_command
     original_stay22 = trvl.search_stay22_sync
@@ -126,6 +137,14 @@ async def main():
         ))
         assert flix["status"] == "empty"
         assert flix["provider_status"]["timed_out"] is True
+
+        trvl.run_json_command = fake_flix_routes
+        flix = await trvl.flix_search(ReiseRequest(
+            origin="Frankfurt(Main)Hbf", destination="Köln Hbf", travel_date=future, max_results=3,
+        ))
+        assert flix["status"] == "ok", flix
+        assert len(flix["routes"]) == 1, flix
+        assert flix["routes"][0]["arrival"]["city"] == "Cologne", flix
     finally:
         trvl.run_json_command = original
         trvl.search_stay22_sync = original_stay22

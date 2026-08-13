@@ -1,6 +1,6 @@
 FROM golang:1.26-bookworm AS trvl-builder
-ARG TRVL_REF=v1.21.3
-RUN case "$TRVL_REF" in v[0-9]*.[0-9]*.[0-9]*) ;; *) echo "TRVL_REF must be a version tag such as v1.21.3" >&2; exit 2 ;; esac
+ARG TRVL_REF=v1.21.4
+RUN case "$TRVL_REF" in v[0-9]*.[0-9]*.[0-9]*) ;; *) echo "TRVL_REF must be a version tag such as v1.21.4" >&2; exit 2 ;; esac
 RUN apt-get update \
     && apt-get install -y --no-install-recommends git ca-certificates \
     && rm -rf /var/lib/apt/lists/*

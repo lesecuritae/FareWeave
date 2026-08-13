@@ -242,6 +242,23 @@ keine zweite Datenbank und keine vollständige Datensatzkopie angelegt. Mit
 
 Voraussetzungen sind Docker und das Docker-Compose-Plugin. Der Installer legt beim ersten Start eine `.env` mit zufälligem internem Bridge-Token an, baut beide Images und führt die Container-Regressionen sowie die DB-Selbsttests aus.
 
+### Fertige Docker-Images
+
+```bash
+docker pull ghcr.io/lesecuritae/fareweave-app:latest
+docker pull ghcr.io/lesecuritae/fareweave-db-api:latest
+```
+
+Für die normale Installation verwendet Docker Compose standardmäßig diese fertigen Images:
+
+```bash
+cp .env.example .env
+sed -i "s/CHANGE_ME/$(openssl rand -hex 32)/" .env
+docker compose up -d
+```
+
+Der lokale Quellcode-Build bleibt weiterhin möglich:
+
 ```bash
 chmod +x install.sh
 ./install.sh
@@ -270,7 +287,7 @@ Ein eigener Stay22-Key kann optional als `STAY22_API_KEY` in `.env` hinterlegt w
 
 ### trvl aktualisieren
 
-trvl ist über genau ein Build-Argument gepinnt. FareWeave 0.0.1 verwendet standardmäßig `trvl v1.21.3`.
+trvl ist über genau ein Build-Argument gepinnt. FareWeave 0.0.1 verwendet standardmäßig `trvl v1.21.4`.
 
 Für einen späteren veröffentlichten Versionstag kann beispielsweise neu gebaut werden:
 
@@ -342,7 +359,7 @@ FareWeave ist unabhängig von Deutsche Bahn, BetterBahn, Flix, trvl, Transitous,
 
 Der von diesem Repository stammende FareWeave-Code steht unter der [MIT License](LICENSE).
 
-Drittanbieter behalten ihre eigenen Lizenzen. Besonders wichtig ist `trvl v1.21.3`: Diese Abhängigkeit steht unter der **PolyForm Noncommercial License 1.0.0**. Die MIT-Lizenz von FareWeave hebt die nichtkommerzielle Einschränkung von trvl nicht auf. Wer den kompletten Standard-Stack kommerziell einsetzen möchte, muss die Lizenzbedingungen von trvl separat klären.
+Drittanbieter behalten ihre eigenen Lizenzen. Besonders wichtig ist `trvl v1.21.4`: Diese Abhängigkeit steht unter der **PolyForm Noncommercial License 1.0.0**. Die MIT-Lizenz von FareWeave hebt die nichtkommerzielle Einschränkung von trvl nicht auf. Wer den kompletten Standard-Stack kommerziell einsetzen möchte, muss die Lizenzbedingungen von trvl separat klären.
 
 Details stehen in [THIRD_PARTY.md](THIRD_PARTY.md).
 

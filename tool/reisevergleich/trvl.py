@@ -167,6 +167,39 @@ def _enrich_flix_routes(
     return routes
 
 
+_FLIX_PLACE_ALIASES = {
+    "hannover": "hanover",
+    "koeln": "cologne",
+    "koln": "cologne",
+    "köln": "cologne",
+    "muenchen": "munich",
+    "munchen": "munich",
+    "münchen": "munich",
+    "nuernberg": "nuremberg",
+    "nurnberg": "nuremberg",
+    "nürnberg": "nuremberg",
+}
+
+
+def _flix_place_key(value: Any) -> str:
+    text = str(value or "").casefold().replace("ß", "ss")
+    text = re.sub(r"\b(hbf|hauptbahnhof|central station|zob)\b", " ", text)
+    words = re.findall(r"[a-zäöü]+", text)
+    if not words:
+        return ""
+    return _FLIX_PLACE_ALIASES.get(words[0], words[0])
+
+
+def _flix_endpoint_matches_request(stop: Any, expected: str) -> bool:
+    if not isinstance(stop, dict):
+        return True
+    actual = stop.get("city") or stop.get("station") or stop.get("address")
+    if not actual or _looks_like_station_id(actual):
+        return True
+    actual_key, expected_key = _flix_place_key(actual), _flix_place_key(expected)
+    return not actual_key or not expected_key or actual_key == expected_key
+
+
 def _compact_ground_leg(leg: dict[str, Any]) -> dict[str, Any]:
     return {
         key: value
@@ -990,6 +1023,10 @@ async def flix_search(request: ReiseRequest) -> dict[str, Any]:
 
     filtered = []
     for route in routes:
+        if not _flix_endpoint_matches_request(route.get("departure"), request.origin):
+            continue
+        if not _flix_endpoint_matches_request(route.get("arrival"), request.destination):
+            continue
         mode = str(route.get("type") or "").casefold()
         if mode == "train":
             kind = "train"
