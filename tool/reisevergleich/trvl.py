@@ -5,6 +5,7 @@ import json
 import os
 import re
 import time
+import urllib.parse
 import urllib.request
 from datetime import date, datetime, timedelta
 from typing import Any
@@ -17,6 +18,7 @@ from .config import (
     TRANSFER_PROVIDER_TIMEOUT, TRVL_BIN,
 )
 from .models import FlightRequest, HotelRequest, ReiseRequest
+from .db import rank_routes
 from .hotel_stay22 import search_stay22_sync
 from .airports import AIRPORT_TRANSIT_QUERIES, CITY_TRANSIT_QUERIES
 from .transitous import search as transitous_direct_search
@@ -28,18 +30,19 @@ from .utils import (
     build_google_maps_url,
     run_command,
     run_json_command,
+    route_departure_in_window,
 )
 
 
 
 _FLIX_NETWORK_URL = os.environ.get(
     "FLIX_NETWORK_URL",
-    "https://app-cdn.flixbus.com/mobile/v1/network/en.json",
+    "https://global.api.flixbus.com/search/autocomplete/stations",
 )
 _FLIX_NETWORK_TIMEOUT = max(2, min(int(os.environ.get("FLIX_NETWORK_TIMEOUT", "6")), 15))
 _FLIX_NETWORK_SUCCESS_TTL = 6 * 60 * 60
 _FLIX_NETWORK_FAILURE_TTL = 15 * 60
-_flix_station_cache: dict[str, dict[str, Any]] = {}
+_flix_station_cache: dict[str, dict[str, dict[str, Any]]] = {}
 _flix_station_cache_at = 0.0
 _flix_station_cache_ok = False
 
@@ -53,66 +56,49 @@ def _looks_like_station_id(value: Any) -> bool:
     return bool(re.fullmatch(r"[0-9a-fA-F]{8}-[0-9a-fA-F-]{27,}", text))
 
 
-def _load_flix_station_directory_sync() -> dict[str, dict[str, Any]]:
-    """Best-effort Flix stop metadata. Failure never blocks the normal search."""
-    global _flix_station_cache_at, _flix_station_cache_ok, _flix_station_cache
-
+def _load_flix_station_directory_sync(queries: tuple[str, ...]) -> dict[str, dict[str, Any]]:
+    """Resolve current Flix stop metadata for the requested places."""
+    global _flix_station_cache_at, _flix_station_cache_ok
     now = time.monotonic()
     ttl = _FLIX_NETWORK_SUCCESS_TTL if _flix_station_cache_ok else _FLIX_NETWORK_FAILURE_TTL
     if _flix_station_cache_at and now - _flix_station_cache_at < ttl:
-        return _flix_station_cache
+        return {key: value for query in queries for key, value in _flix_station_cache.get(query, {}).items()}
 
     _flix_station_cache_at = now
-    try:
-        request = urllib.request.Request(
-            _FLIX_NETWORK_URL,
-            headers={
-                "Accept": "application/json",
-                "User-Agent": "Mozilla/5.0",
-            },
-        )
-        with urllib.request.urlopen(request, timeout=_FLIX_NETWORK_TIMEOUT) as response:
-            data = json.load(response)
-    except Exception:
-        _flix_station_cache_ok = False
-        return _flix_station_cache
-
-    rows = data.get("stations") if isinstance(data, dict) else None
-    if isinstance(rows, dict):
-        rows = list(rows.values())
-    if not isinstance(rows, list):
-        _flix_station_cache_ok = False
-        return _flix_station_cache
-
     directory: dict[str, dict[str, Any]] = {}
-    for item in rows:
-        if not isinstance(item, dict):
+    for query in queries:
+        try:
+            url = _FLIX_NETWORK_URL + "?" + urllib.parse.urlencode({"q": query, "locale": "de"})
+            request = urllib.request.Request(url, headers={"Accept": "application/json", "User-Agent": "Mozilla/5.0"})
+            with urllib.request.urlopen(request, timeout=_FLIX_NETWORK_TIMEOUT) as response:
+                rows = json.load(response)
+        except Exception:
             continue
-        name = str(item.get("name") or "").strip()
-        if not name:
+        if not isinstance(rows, list):
             continue
-        coordinates = item.get("coordinates") if isinstance(item.get("coordinates"), dict) else {}
-        meta = {
-            "name": name,
-            "address": item.get("full_address") or item.get("address"),
-            "latitude": coordinates.get("latitude") or coordinates.get("lat"),
-            "longitude": coordinates.get("longitude") or coordinates.get("lon"),
-        }
-        for key in ("id", "uuid"):
-            value = item.get(key)
-            if value not in (None, ""):
-                directory[str(value)] = meta
+        query_directory: dict[str, dict[str, Any]] = {}
+        for item in rows:
+            if not isinstance(item, dict):
+                continue
+            station_id = str(item.get("id") or "").strip()
+            name = str(item.get("name") or "").strip()
+            if not station_id or not name:
+                continue
+            coordinates = item.get("location") if isinstance(item.get("location"), dict) else {}
+            city = item.get("city") if isinstance(item.get("city"), dict) else {}
+            query_directory[station_id] = {
+                "name": name, "city": city.get("name"), "country": (item.get("country") or {}).get("code"),
+                "address": item.get("address"), "latitude": coordinates.get("lat"), "longitude": coordinates.get("lon"),
+            }
+        _flix_station_cache[query] = query_directory
+        directory.update(query_directory)
+    _flix_station_cache_ok = bool(directory)
+    return directory
 
-    if directory:
-        _flix_station_cache = directory
-        _flix_station_cache_ok = True
-    else:
-        _flix_station_cache_ok = False
-    return _flix_station_cache
 
-
-async def _flix_station_directory() -> dict[str, dict[str, Any]]:
-    return await asyncio.to_thread(_load_flix_station_directory_sync)
+async def _flix_station_directory(*queries: str) -> dict[str, dict[str, Any]]:
+    normalized = tuple(dict.fromkeys(str(query or "").strip() for query in queries if str(query or "").strip()))
+    return await asyncio.to_thread(_load_flix_station_directory_sync, normalized)
 
 
 def _enrich_flix_stop(
@@ -135,6 +121,8 @@ def _enrich_flix_stop(
         return output
 
     output["station"] = meta.get("name") or raw_station
+    if meta.get("city"):
+        output["city"] = meta["city"]
     if meta.get("address"):
         output["address"] = meta["address"]
     if meta.get("latitude") not in (None, ""):
@@ -188,6 +176,46 @@ def _flix_place_key(value: Any) -> str:
     if not words:
         return ""
     return _FLIX_PLACE_ALIASES.get(words[0], words[0])
+
+
+def _normalized_station_name(value: Any) -> str:
+    text = re.sub(r"[^a-z0-9äöüß]+", " ", str(value or "").casefold()).strip()
+    text = re.sub(r"\b(?:hauptbahnhof|central station)\b", "hbf", text)
+    text = re.sub(r"\bcentral bus station\b", "zob", text)
+    return " ".join(text.split())
+
+
+def _flix_exact_stop_matches_request(stop: Any, expected: str) -> bool:
+    if not isinstance(stop, dict) or not stop.get("station"):
+        return False
+    actual = _normalized_station_name(stop["station"])
+    requested = _normalized_station_name(expected)
+    return bool(actual and requested and actual == requested)
+
+
+def _flix_transfer_requirement(stop: Any, requested: str, kind: str) -> dict[str, Any] | None:
+    if not isinstance(stop, dict) or not stop.get("station"):
+        return None
+    if _flix_exact_stop_matches_request(stop, requested):
+        return None
+    return {
+        "required": True,
+        "kind": kind,
+        "requested_station": requested,
+        "actual_flix_stop": stop.get("station"),
+        "same_city": _flix_endpoint_matches_request(stop, requested),
+        "status": "unresolved_stop" if _looks_like_station_id(stop.get("station")) else "connection_required",
+        "minimum_transfer_minutes": 15,
+        "additional_cost": None,
+        "price_note": "Zubringerpreis ist nicht enthalten; 0 EUR nur nach separater Prüfung mit vorhandenem Deutschlandticket.",
+    }
+
+
+def _flix_endpoint_candidate_allowed(stop: Any, expected: str) -> bool:
+    """Allow a different city only when a concrete Flix stop can anchor a feeder."""
+    if isinstance(stop, dict) and str(stop.get("station") or "").strip():
+        return True
+    return _flix_endpoint_matches_request(stop, expected)
 
 
 def _flix_endpoint_matches_request(stop: Any, expected: str) -> bool:
@@ -907,7 +935,7 @@ def _ground_stop(value: Any) -> dict[str, Any] | None:
     }
 
 
-def compact_ground_options(data: Any, max_results: int = 6) -> list[dict[str, Any]]:
+def compact_ground_options(data: Any, max_results: int | None = 6) -> list[dict[str, Any]]:
     rows = _list_from(data, ("routes", "results", "trips", "itineraries"))
     output: list[dict[str, Any]] = []
     for item in rows:
@@ -930,7 +958,7 @@ def compact_ground_options(data: Any, max_results: int = 6) -> list[dict[str, An
             ],
         }
         output.append({key: value for key, value in option.items() if value not in (None, "", [])})
-        if len(output) >= max_results:
+        if max_results is not None and len(output) >= max_results:
             break
     return output
 
@@ -1001,7 +1029,7 @@ async def flix_search(request: ReiseRequest) -> dict[str, Any]:
     elapsed = time.monotonic() - started
     routes = compact_ground_options(
         result.get("data") if result.get("ok") else None,
-        request.max_results * 4,
+        None,
     )
 
     # Exakte Flix-Haltestellen-IDs werden über das öffentliche Netz in Namen
@@ -1017,15 +1045,24 @@ async def flix_search(request: ReiseRequest) -> dict[str, Any]:
         if isinstance(leg, dict)
         for side in ("departure", "arrival")
     ):
-        station_directory = await _flix_station_directory()
+        station_directory = await _flix_station_directory(request.origin, request.destination)
         if station_directory:
             routes = _enrich_flix_routes(routes, station_directory)
 
-    filtered = []
+    train_routes: list[dict[str, Any]] = []
+    bus_routes: list[dict[str, Any]] = []
+    mixed_routes: list[dict[str, Any]] = []
+    seen: set[tuple[Any, ...]] = set()
     for route in routes:
-        if not _flix_endpoint_matches_request(route.get("departure"), request.origin):
+        if request.flix_origin_stop_id and str((route.get("departure") or {}).get("station_id") or "") != request.flix_origin_stop_id:
             continue
-        if not _flix_endpoint_matches_request(route.get("arrival"), request.destination):
+        if request.flix_destination_stop_id and str((route.get("arrival") or {}).get("station_id") or "") != request.flix_destination_stop_id:
+            continue
+        if not _flix_endpoint_candidate_allowed(route.get("departure"), request.origin):
+            continue
+        if not _flix_endpoint_candidate_allowed(route.get("arrival"), request.destination):
+            continue
+        if not route_departure_in_window(route, request.travel_date, request.departure_after):
             continue
         mode = str(route.get("type") or "").casefold()
         if mode == "train":
@@ -1062,16 +1099,73 @@ async def flix_search(request: ReiseRequest) -> dict[str, Any]:
             else "FlixBus" if kind == "bus"
             else "FlixBus/FlixTrain"
         )
-        filtered.append(route)
-        if len(filtered) >= request.max_results:
-            break
+        departure_access = _flix_transfer_requirement(route.get("departure"), request.origin, "origin_to_flix_stop")
+        arrival_egress = _flix_transfer_requirement(route.get("arrival"), request.destination, "flix_stop_to_destination")
+        if departure_access:
+            route["departure_access"] = departure_access
+            route["direct_from_requested_origin"] = False
+        else:
+            route["direct_from_requested_origin"] = True
+        if arrival_egress:
+            route["arrival_egress"] = arrival_egress
+            route["direct_to_requested_destination"] = False
+        else:
+            route["direct_to_requested_destination"] = True
+        self_managed = int(bool(departure_access)) + int(bool(arrival_egress))
+        if self_managed:
+            route["flix_transfers"] = as_int(route.get("transfers"))
+            route["self_managed_transfers"] = self_managed
+            route["transfers"] = as_int(route.get("transfers")) + self_managed
+            route["price_complete"] = False
+            route["price_note"] = "Flix-Preis ohne erforderlichen Zubringer/Weitertransfer; Gesamtpreis offen."
+        else:
+            route["price_complete"] = True
+        fingerprint = _ground_fingerprint(route)
+        if fingerprint in seen:
+            continue
+        seen.add(fingerprint)
+        if kind == "train":
+            train_routes.append(route)
+        elif kind == "bus":
+            bus_routes.append(route)
+        else:
+            mixed_routes.append(route)
+
+    ranked_train = rank_routes(train_routes, request.preference)
+    ranked_bus = rank_routes(bus_routes, request.preference)
+    ranked_mixed = rank_routes(mixed_routes, request.preference)
+    ranked_all = rank_routes(ranked_train + ranked_bus + ranked_mixed, request.preference)
+    selected: list[dict[str, Any]] = []
+    if request.max_results == 1:
+        selected = ranked_all[:1]
+    else:
+        for index in range(2):
+            for group in (ranked_train[:2], ranked_bus[:2]):
+                if index < len(group) and len(selected) < request.max_results:
+                    selected.append(group[index])
+        selected_keys = {_ground_fingerprint(route) for route in selected}
+        for route in ([] if len(selected) >= request.max_results else ranked_all):
+            key = _ground_fingerprint(route)
+            if key in selected_keys:
+                continue
+            selected.append(route)
+            selected_keys.add(key)
+            if len(selected) >= request.max_results:
+                break
 
     return {
-        "status": "ok" if filtered else "empty",
-        "routes": filtered,
+        "status": "ok" if selected else "empty",
+        "routes": selected,
+        "candidate_routes": ranked_all,
+        "candidate_counts": {
+            "train": len(ranked_train),
+            "bus": len(ranked_bus),
+            "mixed": len(ranked_mixed),
+        },
+        "raw_route_count": len(routes),
         "station_metadata_resolved": bool(station_directory),
         "provider_status": _command_status("flixbus", result, elapsed, len(routes)),
-        "error": None if filtered else result.get("error"),
+        "error": None if selected else result.get("error"),
     }
 
 
@@ -1307,3 +1401,48 @@ async def capability_report() -> dict[str, Any]:
         result = await asyncio.to_thread(run_command, [TRVL_BIN, command, "--help"], 20)
         report[command] = {"ok": bool(result.get("ok")), "error": result.get("stderr") if not result.get("ok") else None}
     return report
+
+
+async def discover_flix_stops(request: ReiseRequest) -> dict[str, Any]:
+    """Return only uniquely identified, resolved stops seen in current Flix routes."""
+    probe = request.model_copy(update={
+        "flix_origin_stop_id": None,
+        "flix_destination_stop_id": None,
+        "max_results": 12,
+    })
+    result = await flix_search(probe)
+
+    def collect(side: str) -> list[dict[str, Any]]:
+        found: dict[str, dict[str, Any]] = {}
+        for route in result.get("candidate_routes") or []:
+            stop = route.get(side)
+            if not isinstance(stop, dict):
+                continue
+            station_id = str(stop.get("station_id") or "").strip()
+            name = str(stop.get("station") or "").strip()
+            if not station_id or not name or _looks_like_station_id(name):
+                continue
+            item = found.setdefault(station_id, {
+                key: value for key, value in {
+                    "station_id": station_id,
+                    "name": name,
+                    "city": stop.get("city"),
+                    "latitude": stop.get("latitude"),
+                    "longitude": stop.get("longitude"),
+                    "address": stop.get("address"),
+                    "types": [],
+                }.items() if value not in (None, "", [])
+            })
+            item.setdefault("types", [])
+            kind = route.get("flix_kind")
+            if kind and kind not in item["types"]:
+                item["types"].append(kind)
+        return sorted(found.values(), key=lambda item: (str(item.get("name") or "").casefold(), item["station_id"]))
+
+    return {
+        "status": result.get("status"),
+        "origin_stops": collect("departure"),
+        "destination_stops": collect("arrival"),
+        "raw_route_count": result.get("raw_route_count", 0),
+        "provider_status": result.get("provider_status"),
+    }

@@ -8,7 +8,7 @@
 
 Bahn, Deutschlandticket, Split-Tickets, FlixTrain, FlixBus, Flüge, Flughafenzubringer, Transfers und Unterkünfte landen in einer gemeinsamen Planung. FareWeave schaut dabei nicht nur, ob irgendwo ein günstiger Preis auftaucht. Die einzelnen Teile müssen zeitlich und logisch zusammenpassen.
 
-Aktuelle Version: **0.0.1**
+Aktuelle Version: **0.0.2**
 
 FareWeave verkauft und bucht selbst nichts. Wenn ein Provider einen brauchbaren Angebotslink liefert, kann er direkt aus dem Ergebnis geöffnet werden. Wo kein direkter Link vorhanden ist, gibt es an passenden Stellen einen manuellen Gegencheck, etwa bei der Deutschen Bahn, Google Flights, Google Hotels oder Google Maps. Preis und Verfügbarkeit werden beim eigentlichen Anbieter noch einmal geprüft.
 
@@ -76,6 +76,8 @@ FlixTrain und FlixBus können direkt in denselben Vergleich einbezogen werden. D
 
 FareWeave kann Flix außerdem in gemischten Reiseketten verwenden. Ein Beispiel wäre eine mit dem Deutschlandticket abgedeckte Nahverkehrsstrecke, ein bezahlter Flix-Abschnitt und anschließend wieder eine D-Ticket-Strecke.
 
+Bei abweichenden tatsächlichen Flix-Halten kann FareWeave passende Zu- und Abbringer einbeziehen. Die Oberfläche bietet standardmäßig eine automatische Haltestellenwahl; alternativ kann ein aktuell vom Provider gelieferter konkreter Halt verbindlich ausgewählt werden.
+
 Auch hier werden die zusätzlichen Kosten nur dort angesetzt, wo tatsächlich ein weiteres Ticket gebraucht wird.
 
 ## Warum trvl drin ist
@@ -94,11 +96,11 @@ trvl liefert an ausgewählten Stellen Daten. FareWeave entscheidet anschließend
 
 Die Flugabfragen laufen bewusst providerweise und mit eigenen Zeitlimits. Ein langsamer oder kaputter Provider soll nicht die komplette Reiseplanung blockieren.
 
-In FareWeave 0.0.1 werden zuerst **Skiplagged, Ryanair, Vueling und easyJet** abgefragt. Reichen die Ergebnisse nicht aus, folgen **Transavia, Norwegian, Air France/KLM und Wizz Air**.
+In FareWeave 0.0.2 werden zuerst **Skiplagged, Ryanair, Vueling und easyJet** abgefragt. Reichen die Ergebnisse nicht aus, folgen **Transavia, Norwegian, Air France/KLM und Wizz Air**.
 
 Die trvl-Sammelabfrage wird dafür nicht einfach unbeschränkt durchgereicht. FareWeave fragt die benötigten Provider isoliert ab, führt brauchbare Ergebnisse zusammen und verwirft chronologisch unplausible Flüge.
 
-Google Flights ist zusätzlich als manueller Gegencheck eingebaut. Es handelt sich in FareWeave 0.0.1 dabei **nicht um einen eigenen automatischen Google-Flights-Provider**, sondern um einen passenden Suchlink für die betreffende Strecke und die gewählten Reisedaten.
+Google Flights ist zusätzlich als manueller Gegencheck eingebaut. Es handelt sich in FareWeave 0.0.2 dabei **nicht um einen eigenen automatischen Google-Flights-Provider**, sondern um einen passenden Suchlink für die betreffende Strecke und die gewählten Reisedaten.
 
 ## Transfers und öffentlicher Verkehr
 
@@ -348,7 +350,7 @@ docker compose build
 docker compose up -d
 ```
 
-trvl ist über `TRVL_REF` gepinnt; FareWeave 0.0.1 verwendet standardmäßig `v1.21.4`.
+trvl ist über `TRVL_REF` gepinnt; FareWeave 0.0.2 verwendet standardmäßig `v1.21.4`.
 
 ## Qualitätssicherung
 

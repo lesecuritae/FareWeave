@@ -31,8 +31,11 @@ class ReiseRequest(BaseModel):
     include_flixtrain: bool = True
     include_flixbus: bool = True
     max_transfers: int | None = Field(default=None, ge=0, le=8)
-    max_results: int = Field(default=8, ge=1, le=12)
+    max_results: int = Field(default=10, ge=1, le=12)
     split_ticket_check: bool = True
+    deutschlandticket: bool = False
+    flix_origin_stop_id: str | None = None
+    flix_destination_stop_id: str | None = None
 
     @field_validator("origin", "destination")
     @classmethod
@@ -238,7 +241,9 @@ class TripRequest(BaseModel):
     destination_airport_buffer_minutes: int = Field(default=120, ge=60, le=360)
     return_airport_buffer_minutes: int = Field(default=60, ge=30, le=240)
 
-    max_results: int = Field(default=3, ge=1, le=8)
+    max_results: int = Field(default=10, ge=1, le=12)
+    flix_origin_stop_id: str | None = None
+    flix_destination_stop_id: str | None = None
     refresh_cache: bool = False
 
     @field_validator("origin", "destination")

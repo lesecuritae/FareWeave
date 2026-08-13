@@ -55,7 +55,9 @@ print("UI-Vertrag: OK")
 assert "3 sinnvolle" not in html
 assert "maxResults" not in html
 assert "journey_type: state.journeyType" in js
-assert "max_results: 3" in js
+assert "max_results: 10" in js
+assert "flix_origin_stop_id:" in js and "flix_destination_stop_id:" in js
+assert "Automatisch" in html and "/api/flix-stops" in js
 
 assert "class=\"lodging-panel hidden\"" in html
 assert "classList.toggle(\"hidden\", isGround || state.journeyType === 'one_way')" in js
@@ -66,7 +68,7 @@ assert html.count("flight-option") == 5
 assert 'class="check flight-option"' in html
 assert "querySelectorAll('.flight-option')" in js
 
-assert html.count("feeder-option") == 4
+assert html.count("feeder-option") == 6
 assert "querySelectorAll('.feeder-option')" in js
 assert "isGround && option.classList.contains('flight-option')" in js
 assert "ticketPanel').classList.toggle('disabled'" not in js

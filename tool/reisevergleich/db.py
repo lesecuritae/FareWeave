@@ -183,6 +183,8 @@ async def db_split_analysis(analysis_token: str) -> dict[str, Any]:
 
 def rank_routes(routes: list[dict[str, Any]], preference: str) -> list[dict[str, Any]]:
     def price(route: dict[str, Any]) -> float:
+        if route.get("price_complete") is False:
+            return 1_000_000.0
         value = as_float(route.get("price"))
         split_value = as_float(route.get("best_split_price"))
         if split_value > 0:

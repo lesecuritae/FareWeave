@@ -4,14 +4,14 @@ import asyncio
 from typing import Any
 
 import httpx
-from fastapi import APIRouter
+from fastapi import APIRouter, Query
 
 from .airports import AIRPORT_CITY_NAMES, AIRPORT_STATIONS
 from .cache import health as cache_health
 from .config import APP_VERSION, DB_API_URL, TRANSITOUS_URL, TRANSITOUS_USER_AGENT, today_iso
-from .models import TripRequest
+from .models import ReiseRequest, TripRequest
 from .service import search
-from .trvl import capability_report
+from .trvl import capability_report, discover_flix_stops
 
 router = APIRouter()
 
@@ -36,7 +36,7 @@ async def config() -> dict[str, Any]:
             "hotel_property_type": "hotel",
             "hotel_min_stars": 3,
             "airport_buffer_minutes": 120,
-            "max_results": 3,
+            "max_results": 10,
         },
         "airport_cities": AIRPORT_CITY_NAMES,
         "airport_stations": AIRPORT_STATIONS,

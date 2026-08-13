@@ -51,13 +51,24 @@ def complete_connections(
     cheapest_signature = connection_signature(cheapest) if isinstance(cheapest, dict) else None
     fastest_signature = connection_signature(fastest) if isinstance(fastest, dict) else None
 
-    candidates: list[tuple[dict[str, Any], bool]] = []
-    candidates.extend((route, True) for route in deutschlandticket_routes or [] if isinstance(route, dict))
-    for key in ("db_options", "flix_options"):
-        candidates.extend((route, False) for route in component.get(key) or [] if isinstance(route, dict))
-    for route in (cheapest, fastest):
-        if isinstance(route, dict):
-            candidates.append((route, False))
+    visible = component.get("visible_options") or []
+    if visible:
+        candidates: list[tuple[dict[str, Any], bool]] = [
+            (route, False) for route in visible if isinstance(route, dict)
+        ]
+    else:
+        candidates = []
+        for key in ("db_options", "flix_options"):
+            candidates.extend((route, False) for route in component.get(key) or [] if isinstance(route, dict))
+    visible_signatures = {connection_signature(route) for route in visible if isinstance(route, dict)}
+    candidates.extend(
+        (route, True) for route in deutschlandticket_routes or []
+        if isinstance(route, dict) and (not visible or connection_signature(route) in visible_signatures)
+    )
+    if not visible:
+        for route in (cheapest, fastest):
+            if isinstance(route, dict):
+                candidates.append((route, False))
 
     merged: dict[tuple[Any, ...], dict[str, Any]] = {}
     order: list[tuple[Any, ...]] = []

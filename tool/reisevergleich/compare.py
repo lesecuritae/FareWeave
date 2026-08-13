@@ -4,23 +4,54 @@ import asyncio
 from datetime import date, datetime, timedelta
 from typing import Any
 
-from .config import TZ, today_iso
+from .config import today_iso
 from .db import build_manual_db_links, compact_attempts, compact_route, rank_routes
+from .ground_connections import connection_signature
+from .flix_connections import complete_flix_routes
 from .models import DeutschlandticketRequest, ReiseRequest
 from .provider_cache import db_search_with_retry, db_split_analysis, flix_search, transitous_search
 from .ground_mixed import ground_mixed_options
 from .history import enrich_routes_history
-from .utils import as_float, as_int, parse_datetime
+from .utils import as_float, as_int, parse_datetime, route_departure_in_window
 
-def _route_departure_in_window(route: dict[str, Any], travel_date: str, departure_after: str) -> bool:
-    departure = route.get("departure")
-    if isinstance(departure, dict):
-        departure = departure.get("time")
-    parsed = parse_datetime(departure)
-    if not parsed:
-        return False
-    floor = datetime.fromisoformat(f"{travel_date}T{departure_after}:00").replace(tzinfo=TZ)
-    return parsed.astimezone(TZ) >= floor
+_route_departure_in_window = route_departure_in_window
+
+def select_visible_ground_options(
+    db_routes: list[dict[str, Any]],
+    flix_routes: list[dict[str, Any]],
+    request: ReiseRequest,
+) -> list[dict[str, Any]]:
+    """Reserve pure Flix diversity, then prefer DB and use Flix as backfill."""
+    ranked_db = rank_routes(db_routes, request.preference)
+    ranked_flix = rank_routes(flix_routes, request.preference)
+    if request.max_results == 1:
+        return rank_routes(ranked_db + ranked_flix, request.preference)[:1]
+
+    train = [route for route in ranked_flix if route.get("flix_kind") == "train"]
+    bus = [route for route in ranked_flix if route.get("flix_kind") == "bus"]
+    selected: list[dict[str, Any]] = []
+    reserved_groups = (
+        train[:2] if request.include_flixtrain else [],
+        bus[:2] if request.include_flixbus else [],
+    )
+    for index in range(2):
+        for group in reserved_groups:
+            if index < len(group) and len(selected) < request.max_results:
+                selected.append(group[index])
+
+    known = {connection_signature(route) for route in selected}
+    if len(selected) >= request.max_results:
+        return selected
+    for pool in (ranked_db, ranked_flix):
+        for route in pool:
+            signature = connection_signature(route)
+            if signature in known:
+                continue
+            selected.append(route)
+            known.add(signature)
+            if len(selected) >= request.max_results:
+                return selected
+    return selected
 
 
 def _compact_split(split: dict[str, Any]) -> dict[str, Any]:
@@ -78,10 +109,11 @@ async def compare_trip(request: ReiseRequest) -> dict[str, Any]:
         if db_routes:
             db_source = "transitous"
 
-    db_routes = [route for route in db_routes if _route_departure_in_window(route, request.travel_date, request.departure_after)]
+    db_routes = [route for route in db_routes if route_departure_in_window(route, request.travel_date, request.departure_after)]
 
-    flix_routes = flix_result.get("routes") or []
-    flix_routes = [route for route in flix_routes if _route_departure_in_window(route, request.travel_date, request.departure_after)]
+    flix_routes = flix_result.get("candidate_routes") or flix_result.get("routes") or []
+    flix_routes = [route for route in flix_routes if route_departure_in_window(route, request.travel_date, request.departure_after)]
+    flix_routes = await complete_flix_routes(flix_routes, request)
 
     # Historie ist eine unabhängige, rein additive Schicht. Fehler oder Timeouts
     # dürfen Providerresultate, Preise und Ranking niemals verändern.
@@ -125,7 +157,11 @@ async def compare_trip(request: ReiseRequest) -> dict[str, Any]:
 
     ranked_db = rank_routes(db_routes, request.preference)
     combined = rank_routes(db_routes + flix_routes, request.preference)
-    priced = [route for route in combined if as_float(route.get("price")) > 0]
+    visible_options = select_visible_ground_options(db_routes, flix_routes, request)
+    priced = [
+        route for route in combined
+        if as_float(route.get("price")) > 0 and route.get("price_complete") is not False
+    ]
     fastest = min(combined, key=lambda route: as_int(route.get("duration_minutes")) or 1_000_000, default=None)
 
     has_db_price = any(
@@ -160,7 +196,11 @@ async def compare_trip(request: ReiseRequest) -> dict[str, Any]:
             "flix": flix_result.get("provider_status"),
         },
         "db_options": [compact_route(route) for route in ranked_db[:3]],
-        "flix_options": flix_routes[:3],
+        "flix_options": (flix_result.get("routes") or [])[:3],
+        "visible_options": [
+            compact_route(route) if route.get("db_source") else route
+            for route in visible_options
+        ],
         "recommendation": {
             "fastest": compact_route(fastest) if isinstance(fastest, dict) and fastest.get("db_source") else fastest,
             "cheapest_with_live_price": compact_route(priced[0]) if priced and priced[0].get("db_source") else (priced[0] if priced else None),
@@ -261,6 +301,7 @@ def _direction_summary(result: dict[str, Any]) -> dict[str, Any]:
         "db_source": result.get("db_source"),
         "db_options": result.get("db_options") or [],
         "flix_options": result.get("flix_options") or [],
+        "visible_options": result.get("visible_options") or [],
         "recommendation": result.get("recommendation"),
         "split_ticket": result.get("split_ticket"),
         "manual_db_links": result.get("manual_db_links"),
@@ -285,6 +326,8 @@ async def compare_ground_round_trip(
     deutschlandticket_mode: str | None = None,
     split_candidates: list[str] | None = None,
     one_way: bool = False,
+    flix_origin_stop_id: str | None = None,
+    flix_destination_stop_id: str | None = None,
 ) -> dict[str, Any]:
     if deutschlandticket_mode == "only":
         outward_dt = await deutschlandticket(DeutschlandticketRequest(
@@ -373,6 +416,9 @@ async def compare_ground_round_trip(
         max_transfers=max_transfers,
         max_results=max_results,
         split_ticket_check=split_ticket_check,
+        deutschlandticket=deutschlandticket_mode == "include",
+        flix_origin_stop_id=flix_origin_stop_id,
+        flix_destination_stop_id=flix_destination_stop_id,
     )
     outbound = await compare_trip(outbound_request)
 
@@ -444,6 +490,9 @@ async def compare_ground_round_trip(
         max_transfers=max_transfers,
         max_results=max_results,
         split_ticket_check=split_ticket_check,
+        deutschlandticket=deutschlandticket_mode == "include",
+        flix_origin_stop_id=flix_destination_stop_id,
+        flix_destination_stop_id=flix_origin_stop_id,
     )
     return_result = await compare_trip(return_request)
     outbound_mixed: list[dict[str, Any]] = []

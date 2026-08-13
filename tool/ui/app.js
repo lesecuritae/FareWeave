@@ -129,6 +129,8 @@ function getPayload() {
     deutschlandticket_only: state.travelMode === 'ground' && state.dticket && document.getElementById('dticketOnly').checked,
     include_flixtrain: state.travelMode !== 'flight_stay' && $('includeFlixtrain').checked,
     include_flixbus: state.travelMode !== 'flight_stay' && $('includeFlixbus').checked,
+    flix_origin_stop_id: $('flixOriginStop').value || null,
+    flix_destination_stop_id: $('flixDestinationStop').value || null,
     split_ticket_check: state.travelMode !== 'flight_stay' && $('splitTicket').checked,
     include_destination_transfer: state.travelMode !== 'ground' && $('destinationTransfer').checked,
     origin_airports: originAirports,
@@ -138,9 +140,41 @@ function getPayload() {
     hotel_min_stars: hotelUsesStars ? Number(document.getElementById('hotelStars').value) : 0,
     airport_buffer_minutes: Number($('airportBuffer').value),
     stops: $('stops').value,
-    max_results: 3,
+    max_results: 10,
     refresh_cache: $('refreshCache').checked,
   };
+}
+
+function replaceStopOptions(select, stops) {
+  const selected = select.value;
+  select.replaceChildren(new Option("Automatisch", ""));
+  (stops || []).forEach(stop => {
+    const detail = [stop.city, stop.address].filter(Boolean).join(" · ");
+    select.add(new Option(detail ? stop.name + " — " + detail : stop.name, stop.station_id));
+  });
+  select.value = Array.from(select.options).some(option => option.value === selected) ? selected : "";
+}
+
+async function refreshFlixStops() {
+  const origin = document.getElementById("origin").value.trim();
+  const destination = document.getElementById("destination").value.trim();
+  const travelDate = document.getElementById("departureDate").value;
+  if (!origin || !destination || !travelDate || state.travelMode !== "ground") {
+    replaceStopOptions(document.getElementById("flixOriginStop"), []);
+    replaceStopOptions(document.getElementById("flixDestinationStop"), []);
+    return;
+  }
+  const params = new URLSearchParams({origin: origin, destination: destination, travel_date: travelDate, departure_after: document.getElementById("departureAfter").value || "00:00"});
+  try {
+    const response = await fetch("/api/flix-stops?" + params.toString());
+    if (!response.ok) throw new Error("HTTP " + response.status);
+    const data = await response.json();
+    replaceStopOptions(document.getElementById("flixOriginStop"), data.origin_stops);
+    replaceStopOptions(document.getElementById("flixDestinationStop"), data.destination_stops);
+  } catch (_) {
+    replaceStopOptions(document.getElementById("flixOriginStop"), []);
+    replaceStopOptions(document.getElementById("flixDestinationStop"), []);
+  }
 }
 
 function actionLinks(offerUrl, manualUrl) {
@@ -227,7 +261,7 @@ function reliabilityHtml(connection) {
   }
   const approximate = reliability.approximate ? 'ca. ' : '';
   const confidence = reliability.approximate ? '<span class="reliability-quality">geringe Datenbasis</span>' : '';
-  const legDetails = (connection.legs || []).map(leg => {
+  const legDetails = (connection.segments?.length ? connection.segments.flatMap(segment => segment.legs?.length ? segment.legs : [segment]) : (connection.legs || [])).map(leg => {
     const stats = leg.reliability;
     if (!stats || !stats.sample_count) return '';
     const median = stats.median_arrival_delay_minutes;
@@ -253,13 +287,13 @@ function groundConnectionsHtml(title, component) {
     const price = connection.deutschlandticket_covered
       ? '0 € zusätzlich'
       : (connection.price !== undefined ? money(connection.price, connection.currency || 'EUR') : 'Preis offen');
-    const legs = (connection.legs || []).map(leg =>
-      `<div class="timeline-row connection-leg"><div class="time">${hm(leg.departure)} → ${hm(leg.arrival)}</div><div><strong>${esc(leg.line || leg.mode || 'Teilstrecke')}</strong><div class="meta">${esc(leg.origin || '')} → ${esc(leg.destination || '')}</div></div></div>`
+    const legs = (connection.segments?.length ? connection.segments.flatMap(segment => segment.legs?.length ? segment.legs : [segment]) : (connection.legs || [])).map(leg =>
+      `<div class="timeline-row connection-leg"><div class="time">${hm(leg.departure?.time || leg.departure)} → ${hm(leg.arrival?.time || leg.arrival)}</div><div><strong>${esc(leg.line || leg.mode || 'Teilstrecke')}</strong><div class="meta">${esc(leg.origin || '')} → ${esc(leg.destination || '')}</div></div></div>`
     ).join('');
     const transfers = connection.transfers !== undefined
       ? `${connection.transfers} ${connection.transfers === 1 ? 'Umstieg' : 'Umstiege'}`
       : '';
-    return `<article class="result-card connection-card"><div class="card-head"><div><div class="connection-labels">${labels}</div><h3>${hm(connection.departure)} → ${hm(connection.arrival)}</h3><p class="connection-summary">${durationText(connection.duration_minutes)}${transfers ? ` · ${transfers}` : ''}</p>${reliabilityHtml(connection)}</div><span class="price-pill">${price}</span></div><div class="timeline">${legs || '<p class="muted">Keine Teilstrecken verfügbar.</p>'}</div>${actionLinks(connection.offer_url, connection.manual_url)}</article>`;
+    return `<article class="result-card connection-card"><div class="card-head"><div><div class="connection-labels">${labels}</div><h3>${hm(connection.departure?.time || connection.departure)} → ${hm(connection.arrival?.time || connection.arrival)}</h3><p class="connection-summary">${durationText(connection.duration_minutes)}${transfers ? ` · ${transfers}` : ''}</p>${reliabilityHtml(connection)}</div><span class="price-pill">${price}</span></div><div class="timeline">${legs || '<p class="muted">Keine Teilstrecken verfügbar.</p>'}</div>${actionLinks(connection.offer_url, connection.manual_url)}</article>`;
   }).join('');
   return `<section class="direction-group" data-direction="${esc(title)}"><div class="direction-heading"><div><span class="eyebrow">Bahn & Bus</span><h2>${esc(title)}</h2></div><span class="direction-count">${connections.length} ${connections.length === 1 ? 'Verbindung' : 'Verbindungen'}</span></div><div class="connection-list">${cards}</div></section>`;
 }
@@ -358,7 +392,10 @@ function bind() {
     state.hotelType = btn.dataset.hotelType;
     syncHotelType();
   }));
-  $('departureDate').addEventListener('change', syncJourneyDates);
+  $('departureDate').addEventListener('change', () => { syncJourneyDates(); refreshFlixStops(); });
+  $('departureAfter').addEventListener('change', refreshFlixStops);
+  $('origin').addEventListener('blur', refreshFlixStops);
+  $('destination').addEventListener('blur', refreshFlixStops);
   $('returnDate').addEventListener('change', syncJourneyDates);
   $('oneWayButton').addEventListener('click', () => {
     $('returnDate').value = '';

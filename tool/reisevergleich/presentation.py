@@ -568,6 +568,7 @@ def _ground_direction(component: Any, dticket_routes: Any = None) -> dict[str, A
         "fastest": _public_links(recommendation.get("fastest")),
         "db_options": _public_links((component.get("db_options") or [])[:3]),
         "flix_options": _public_links((component.get("flix_options") or [])[:3]),
+        "visible_options": _public_links(component.get("visible_options") or []),
         "mixed_ticket_options": _public_links((component.get("mixed_ticket_options") or [])[:8]),
         "split_ticket": _public_links(component.get("split_ticket")),
         "manual_db_links": _public_links(component.get("manual_db_links")),

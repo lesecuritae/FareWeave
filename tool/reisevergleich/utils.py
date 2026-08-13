@@ -36,6 +36,20 @@ def parse_datetime(value: Any) -> datetime | None:
     return parsed if parsed.tzinfo else parsed.replace(tzinfo=TZ)
 
 
+def route_departure_in_window(
+    route: dict[str, Any], travel_date: str, departure_after: str,
+) -> bool:
+    """Return whether a normalized route departs at/after the local request floor."""
+    departure = route.get("departure")
+    if isinstance(departure, dict):
+        departure = departure.get("time")
+    parsed = parse_datetime(departure)
+    if not parsed:
+        return False
+    floor = datetime.fromisoformat(f"{travel_date}T{departure_after}:00").replace(tzinfo=TZ)
+    return parsed.astimezone(TZ) >= floor
+
+
 def local_iso(value: Any) -> str | None:
     parsed = parse_datetime(value)
     if parsed is None:

@@ -132,7 +132,7 @@ def _download_month(url: str, directory: Path) -> Path:
     try:
         response = curl_requests.get(
             url,
-            headers={"User-Agent": "FareWeave/0.0.1"},
+            headers={"User-Agent": "FareWeave/0.0.2"},
             impersonate="firefox",
             timeout=HISTORY_REMOTE_TIMEOUT,
             allow_redirects=True,
