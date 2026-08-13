@@ -600,7 +600,11 @@ function normalizeLeg(leg) {
   return {
     trip_id: leg?.tripId ? String(leg.tripId) : null,
     line: leg?.line?.name || leg?.line?.productName || null,
+    line_name: leg?.line?.name || leg?.line?.productName || null,
+    train_number: leg?.line?.fahrtNr != null ? String(leg.line.fahrtNr) : null,
+    train_type: leg?.line?.productName || leg?.line?.product || null,
     product: leg?.line?.product || null,
+    operator: leg?.line?.operator?.name || leg?.line?.operator || null,
     mode: leg?.line?.mode || null,
     origin: {
       id: leg?.origin?.id ? String(leg.origin.id) : null,

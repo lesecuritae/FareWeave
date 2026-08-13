@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from reisevergleich.api import router
 from reisevergleich.config import APP_VERSION
 from reisevergleich.provider_cache import CACHE_GENERATION
@@ -12,3 +14,12 @@ for required in {"origin","destination","departure_date","deutschlandticket","de
 assert CACHE_GENERATION == APP_VERSION
 assert bytes.fromhex("726571756573745f74657874").decode() not in fields
 print("Strukturierter API-Vertrag: OK")
+
+source = (Path(__file__).resolve().parents[1] / "tool" / "app.py").read_text(encoding="utf-8")
+for header in (
+    "Content-Security-Policy", "X-Content-Type-Options", "X-Frame-Options",
+    "Referrer-Policy", "Permissions-Policy", "Cross-Origin-Opener-Policy",
+):
+    assert header in source
+assert "frame-ancestors 'none'" in source
+assert "object-src 'none'" in source

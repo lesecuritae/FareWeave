@@ -218,6 +218,31 @@ function groundAlternativesHtml(title, component) {
   }).join("");
   return `<article class="result-card alternatives-card"><div class="card-head"><div><span class="eyebrow">${esc(title)}</span><h3>Misch- & Split-Tickets</h3></div><span class="price-pill">${mixed.length + split.length} Optionen</span></div><div class="alternative-list">${mixedRows}${splitRows}</div></article>`;
 }
+
+function reliabilityHtml(connection) {
+  const reliability = connection?.reliability;
+  if (!reliability) return '';
+  if (reliability.status !== 'ok' || reliability.percent === undefined) {
+    return `<div class="reliability-summary reliability-empty">Keine ausreichenden historischen Daten</div>`;
+  }
+  const approximate = reliability.approximate ? 'ca. ' : '';
+  const confidence = reliability.approximate ? '<span class="reliability-quality">geringe Datenbasis</span>' : '';
+  const legDetails = (connection.legs || []).map(leg => {
+    const stats = leg.reliability;
+    if (!stats || !stats.sample_count) return '';
+    const median = stats.median_arrival_delay_minutes;
+    const p90 = stats.p90_arrival_delay_minutes;
+    const cancellation = stats.cancellation_rate;
+    const quality = stats.quality === 'good' ? 'gut' : stats.quality === 'limited' ? 'begrenzt' : 'gering';
+    return `<div class="reliability-leg"><strong>${esc(leg.line || leg.mode || 'Teilstrecke')}</strong><span>${stats.sample_count} historische Fahrten${median !== undefined ? ` · Median ${median >= 0 ? '+' : ''}${esc(median)} min` : ''}${p90 !== undefined ? ` · P90 ${p90 >= 0 ? '+' : ''}${esc(p90)} min` : ''}${cancellation !== undefined ? ` · Ausfälle ${(Number(cancellation) * 100).toFixed(1)} %` : ''} · Datenqualität ${quality}</span></div>`;
+  }).join('');
+  const connectionDetails = (reliability.connections || []).map(item => item.status === 'ok'
+    ? `<div class="reliability-leg"><strong>${esc(item.station || 'Anschluss')}</strong><span>${item.scheduled_transfer_minutes} min Umstieg · ${item.approximate ? 'ca. ' : ''}${item.percent} %</span></div>`
+    : '').join('');
+  const details = legDetails || connectionDetails ? `<details class="reliability-details"><summary>Historische Details</summary>${connectionDetails}${legDetails}</details>` : '';
+  return `<div class="reliability-summary"><strong>${esc(reliability.label)} · ${approximate}${esc(reliability.percent)} %</strong>${confidence}</div>${details}`;
+}
+
 function groundConnectionsHtml(title, component) {
   const connections = component?.connections || [];
   if (!connections.length) {
@@ -234,7 +259,7 @@ function groundConnectionsHtml(title, component) {
     const transfers = connection.transfers !== undefined
       ? `${connection.transfers} ${connection.transfers === 1 ? 'Umstieg' : 'Umstiege'}`
       : '';
-    return `<article class="result-card connection-card"><div class="card-head"><div><div class="connection-labels">${labels}</div><h3>${hm(connection.departure)} → ${hm(connection.arrival)}</h3><p class="connection-summary">${durationText(connection.duration_minutes)}${transfers ? ` · ${transfers}` : ''}</p></div><span class="price-pill">${price}</span></div><div class="timeline">${legs || '<p class="muted">Keine Teilstrecken verfügbar.</p>'}</div>${actionLinks(connection.offer_url, connection.manual_url)}</article>`;
+    return `<article class="result-card connection-card"><div class="card-head"><div><div class="connection-labels">${labels}</div><h3>${hm(connection.departure)} → ${hm(connection.arrival)}</h3><p class="connection-summary">${durationText(connection.duration_minutes)}${transfers ? ` · ${transfers}` : ''}</p>${reliabilityHtml(connection)}</div><span class="price-pill">${price}</span></div><div class="timeline">${legs || '<p class="muted">Keine Teilstrecken verfügbar.</p>'}</div>${actionLinks(connection.offer_url, connection.manual_url)}</article>`;
   }).join('');
   return `<section class="direction-group" data-direction="${esc(title)}"><div class="direction-heading"><div><span class="eyebrow">Bahn & Bus</span><h2>${esc(title)}</h2></div><span class="direction-count">${connections.length} ${connections.length === 1 ? 'Verbindung' : 'Verbindungen'}</span></div><div class="connection-list">${cards}</div></section>`;
 }

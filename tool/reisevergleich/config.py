@@ -5,6 +5,13 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 
 TZ = ZoneInfo(os.getenv("APP_TIMEZONE", "Europe/Berlin"))
+
+
+def _env_bool(name: str, default: bool) -> bool:
+    value = os.getenv(name)
+    if value is None:
+        return default
+    return value.strip().lower() in {"1", "true", "yes", "on"}
 APP_VERSION = "0.0.1"
 DB_API_URL = os.getenv("DB_API_URL", "http://db-api:3001").rstrip("/")
 TRANSITOUS_URL = os.getenv("TRANSITOUS_URL", "https://api.transitous.org").rstrip("/")
@@ -27,6 +34,14 @@ TRANSITOUS_TIMEOUT = min(max(int(os.getenv("TRANSITOUS_TIMEOUT", "25")), 8), 40)
 DB_SEARCH_TIMEOUT = min(max(int(os.getenv("DB_SEARCH_TIMEOUT", "50")), 20), 75)
 DB_SPLIT_TIMEOUT = min(max(int(os.getenv("DB_SPLIT_TIMEOUT", "45")), 15), 70)
 TRIP_TIMEOUT = min(max(int(os.getenv("TRIP_TIMEOUT", "210")), 90), 360)
+HISTORY_ENABLED = _env_bool("HISTORY_ENABLED", True)
+HISTORY_CACHE_DIR = os.getenv("HISTORY_CACHE_DIR", "/var/lib/reisevergleich/history")
+HISTORY_CACHE_MAX_GB = min(max(float(os.getenv("HISTORY_CACHE_MAX_GB", "5")), 0.1), 100.0)
+HISTORY_REMOTE_TIMEOUT = min(max(float(os.getenv("HISTORY_REMOTE_TIMEOUT", "60")), 2.0), 120.0)
+HISTORY_MAX_CONCURRENCY = min(max(int(os.getenv("HISTORY_MAX_CONCURRENCY", "2")), 1), 4)
+HISTORY_STATS_TTL = min(max(int(os.getenv("HISTORY_STATS_TTL", "86400")), 300), 31_536_000)
+HISTORY_DEFAULT_WINDOW_DAYS = min(max(int(os.getenv("HISTORY_DEFAULT_WINDOW_DAYS", "90")), 7), 730)
+HISTORY_SOURCE_REVISION = os.getenv("HISTORY_SOURCE_REVISION", "main").strip() or "main"
 
 
 def today_iso() -> str:

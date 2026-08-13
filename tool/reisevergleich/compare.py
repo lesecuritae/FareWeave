@@ -9,6 +9,7 @@ from .db import build_manual_db_links, compact_attempts, compact_route, rank_rou
 from .models import DeutschlandticketRequest, ReiseRequest
 from .provider_cache import db_search_with_retry, db_split_analysis, flix_search, transitous_search
 from .ground_mixed import ground_mixed_options
+from .history import enrich_routes_history
 from .utils import as_float, as_int, parse_datetime
 
 def _route_departure_in_window(route: dict[str, Any], travel_date: str, departure_after: str) -> bool:
@@ -81,6 +82,13 @@ async def compare_trip(request: ReiseRequest) -> dict[str, Any]:
 
     flix_routes = flix_result.get("routes") or []
     flix_routes = [route for route in flix_routes if _route_departure_in_window(route, request.travel_date, request.departure_after)]
+
+    # Historie ist eine unabhängige, rein additive Schicht. Fehler oder Timeouts
+    # dürfen Providerresultate, Preise und Ranking niemals verändern.
+    try:
+        db_routes = await enrich_routes_history(db_routes)
+    except Exception:
+        pass
 
     selected_db = rank_routes(db_routes, request.preference)[0] if db_routes else None
     split: dict[str, Any] = {
@@ -203,6 +211,11 @@ async def deutschlandticket(request: DeutschlandticketRequest) -> dict[str, Any]
         routes = transitous_result.get("routes") or []
         if routes:
             source = "transitous"
+
+    try:
+        routes = await enrich_routes_history(routes)
+    except Exception:
+        pass
 
     return {
         "status": "ok" if routes else "empty",
@@ -493,4 +506,3 @@ async def compare_ground_round_trip(
         "price_summary": price_summary,
         "hotel": None,
     }
-

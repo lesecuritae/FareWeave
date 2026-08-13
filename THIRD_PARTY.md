@@ -18,12 +18,24 @@ FareWeave lädt die beiden großen Transportbibliotheken beim Container-Build au
 - Lizenz: **ISC License**
 - Die Originallizenz wird beim Container-Build nach `/usr/share/licenses/db-vendo-client/LICENSE.md` kopiert.
 
+## Historische Deutsche-Bahn-Daten
+
+FareWeave verwendet optional das Hugging-Face-Dataset
+[`piebro/deutsche-bahn-data`](https://huggingface.co/datasets/piebro/deutsche-bahn-data).
+Die Daten basieren auf der offiziellen DB-Timetables-API und stehen laut Dataset-Angabe
+unter [Creative Commons Attribution 4.0 International (CC BY 4.0)](https://creativecommons.org/licenses/by/4.0/).
+
+Quelle und Bearbeitung: `piebro/deutsche-bahn-data`; FareWeave filtert die monatlichen
+Parquet-Dateien auf benötigte Zugläufe und berechnet daraus eigene aggregierte
+Verspätungs- und Zuverlässigkeitswerte. FareWeave übernimmt keinen Quellcode des
+Dataset-Repositories.
+
 ## Weitere verwendete Projekte und Dienste
 
 [Transitous](https://github.com/public-transport/transitous) wird als externe Routingquelle für öffentlichen Verkehr und Transfers verwendet. [BetterBahn](https://github.com/BetterBahn/betterbahn) wird in der README als ursprüngliche Motivation für das integrierte Split-Ticketing genannt; FareWeave übernimmt keinen BetterBahn-Code. Stay22 wird als externer Unterkunftsdienst eingebunden und ist keine mitgelieferte Open-Source-Bibliothek dieses Repositories.
 
 ## Direkte Python-Abhängigkeiten
 
-Die direkt in `tool/requirements.txt` deklarierten Python-Pakete behalten ihre jeweiligen Upstream-Lizenzen. Dazu gehören FastAPI, HTTPX, Pydantic, Uvicorn und `curl_cffi`. Die tatsächlich installierten Versionen ergeben sich aus den dort definierten Versionsgrenzen; `curl_cffi` ist auf `0.16.0` gepinnt.
+Die direkt in `tool/requirements.txt` deklarierten Python-Pakete behalten ihre jeweiligen Upstream-Lizenzen. Dazu gehören FastAPI, HTTPX, Pydantic, Uvicorn, `curl_cffi` und DuckDB. Die tatsächlich installierten Versionen ergeben sich aus den dort definierten Versionsgrenzen; `curl_cffi` ist auf `0.16.0` gepinnt.
 
 Diese Datei ist eine Übersicht und ersetzt keine Originallizenz. Beim Verteilen gebauter Images müssen die darin enthaltenen Drittanbieter-Lizenzdateien und Hinweise erhalten bleiben.

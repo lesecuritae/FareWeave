@@ -190,6 +190,13 @@ body {
 .connection-card h3 { margin: 7px 0 0; font-size: 21px; font-variant-numeric: tabular-nums; }
 .connection-labels { min-height: 24px; }
 .connection-summary { margin: 5px 0 0; color: var(--muted); font-size: 16px; }
+.reliability-summary { display:flex; align-items:center; flex-wrap:wrap; gap:8px; margin-top:10px; color:#08786b; font-size:16px; }
+.reliability-empty { color:var(--muted); }
+.reliability-quality { color:var(--muted); font-size:16px; font-weight:600; }
+.reliability-details { margin-top:8px; color:var(--muted); font-size:16px; }
+.reliability-details summary { cursor:pointer; font-weight:700; }
+.reliability-leg { display:flex; flex-direction:column; gap:2px; margin-top:7px; }
+.reliability-leg strong { color:var(--text); }
 .connection-leg { grid-template-columns: 120px minmax(0, 1fr); }
 .connection-leg > div { min-width: 0; overflow-wrap: anywhere; }
 @media (max-width: 620px) {

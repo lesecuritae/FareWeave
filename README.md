@@ -196,6 +196,33 @@ Browser UI -> FastAPI -> FareWeave-Orchestrierung
 
 Provider besitzen getrennte harte Zeitlimits. Ein Timeout wird als Providerfehler behandelt und blockiert nicht automatisch die übrige Reise.
 
+## Historische Zuverlässigkeit von Bahnverbindungen
+
+FareWeave kann gefundene Bahn-Legs additiv mit 90 Tagen historischer Beobachtungen aus
+[`piebro/deutsche-bahn-data`](https://huggingface.co/datasets/piebro/deutsche-bahn-data)
+anreichern. Die normale Suche, Preise und das Ranking bleiben davon unabhängig.
+
+Der Prozentwert einer Direktfahrt bedeutet den empirisch beobachteten Anteil konkreter
+Fahrtinstanzen, die **nicht explizit ausgefallen sind und ihr Ziel mit höchstens zehn
+Minuten Verspätung erreicht haben**. Fehlende Beobachtungen gelten niemals als Ausfall.
+
+Bei einem Umstieg ist der Wert der empirische Anteil beobachteter Fahrten des zuführenden
+Zuges, deren Ankunftsverspätung nicht größer als die planmäßige Umsteigezeit war;
+explizite Ausfälle zählen als verpasster Anschluss. Bei mehreren Anschlüssen wird der
+Gesamtwert als ausgewiesene Unabhängigkeitsschätzung aus den Einzelwahrscheinlichkeiten
+gebildet. Einzelwerte und Stichprobengröße bleiben in den Details sichtbar.
+
+Die Auswertung bevorzugt Zugnummer, Zugtyp, konkreten Streckenabschnitt, Wochentag und
+Vier-Stunden-Zeitfenster. Bei zu kleiner Teilstichprobe fällt sie innerhalb derselben
+konkreten Zug-/Streckenhistorie auf Wochentag, Zeitfenster und schließlich alle
+Beobachtungen zurück. Ohne belastbare Zugnummer und EVA-IDs wird kein Wert erfunden.
+
+DuckDB dient ausschließlich als eingebettete In-Memory-Parquet-Engine. Dauerhaft werden
+nur gefilterte Zug-/Monats-Parquets unter `/var/lib/reisevergleich/history` gespeichert;
+Metadaten und fertige Statistiken liegen in der bestehenden `cache.sqlite3`. Es wird
+keine zweite Datenbank und keine vollständige Datensatzkopie angelegt. Mit
+`HISTORY_ENABLED=false` ist die Schicht vollständig deaktiviert.
+
 ## Lokaler Start
 
 Voraussetzungen sind Docker und das Docker-Compose-Plugin. Der Installer legt beim ersten Start eine `.env` mit zufälligem internem Bridge-Token an, baut beide Images und führt die Container-Regressionen sowie die DB-Selbsttests aus.

@@ -242,15 +242,26 @@ def compact_route(route: dict[str, Any], *, include_legs: bool = True) -> dict[s
                 key: value for key, value in {
                     "mode": leg.get("mode") or leg.get("type"),
                     "line": leg.get("line"),
+                    "line_name": leg.get("line_name"),
+                    "train_number": leg.get("train_number") or leg.get("fahrt_nr"),
+                    "train_type": leg.get("train_type"),
+                    "product": leg.get("product"),
+                    "operator": leg.get("operator"),
                     "provider": leg.get("provider"),
                     "origin": origin.get("name") if isinstance(origin, dict) else origin,
+                    "origin_id": origin.get("id") if isinstance(origin, dict) else None,
                     "destination": destination.get("name") if isinstance(destination, dict) else destination,
+                    "destination_id": destination.get("id") if isinstance(destination, dict) else None,
                     "departure": local_iso(leg.get("departure")),
                     "arrival": local_iso(leg.get("arrival")),
+                    "reliability": leg.get("reliability"),
+                    "connection_reliability": leg.get("connection_reliability"),
                 }.items() if value not in (None, "", [])
             })
         if legs:
             compact["legs"] = legs
+    if isinstance(route.get("reliability"), dict):
+        compact["reliability"] = route["reliability"]
     return {key: value for key, value in compact.items() if value not in (None, "", [])}
 
 

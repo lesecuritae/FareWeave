@@ -11,7 +11,7 @@ import uuid
 from pathlib import Path
 from typing import Any, Awaitable, Callable
 
-CACHE_SCHEMA = 3
+CACHE_SCHEMA = 4
 DEFAULT_DB = "/var/lib/reisevergleich/cache.sqlite3"
 _stats_var: contextvars.ContextVar[dict[str, int] | None] = contextvars.ContextVar("reise_cache_stats", default=None)
 _refresh_var: contextvars.ContextVar[bool] = contextvars.ContextVar("reise_cache_refresh", default=False)
@@ -72,6 +72,16 @@ def _connect() -> sqlite3.Connection:
         )
     """)
     db.execute("CREATE INDEX IF NOT EXISTS journeys_expiry ON journeys(expires_at)")
+    db.execute("""
+        CREATE TABLE IF NOT EXISTS history_detail_cache (
+            cache_key TEXT PRIMARY KEY, train_type TEXT NOT NULL, train_number TEXT NOT NULL,
+            year INTEGER NOT NULL, month INTEGER NOT NULL, file_path TEXT NOT NULL,
+            row_count INTEGER NOT NULL, file_size INTEGER NOT NULL, created_at REAL NOT NULL,
+            updated_at REAL NOT NULL, last_accessed REAL NOT NULL, source TEXT NOT NULL,
+            source_revision TEXT NOT NULL, schema_version INTEGER NOT NULL
+        )
+    """)
+    db.execute("CREATE INDEX IF NOT EXISTS history_detail_cache_lru ON history_detail_cache(last_accessed)")
     db.commit()
     return db
 
@@ -226,3 +236,40 @@ def _health_sync() -> dict[str, Any]:
 
 async def health() -> dict[str, Any]:
     return await asyncio.to_thread(_health_sync)
+
+
+def history_detail_get(cache_key: str) -> dict[str, Any] | None:
+    now = time.time()
+    with _connect() as db:
+        row = db.execute(
+            "SELECT cache_key,train_type,train_number,year,month,file_path,row_count,file_size,created_at,updated_at,last_accessed,source,source_revision,schema_version FROM history_detail_cache WHERE cache_key=?",
+            (cache_key,),
+        ).fetchone()
+        if row is None:
+            return None
+        db.execute("UPDATE history_detail_cache SET last_accessed=? WHERE cache_key=?", (now, cache_key))
+        db.commit()
+    names = ("cache_key", "train_type", "train_number", "year", "month", "file_path", "row_count", "file_size", "created_at", "updated_at", "last_accessed", "source", "source_revision", "schema_version")
+    return dict(zip(names, row, strict=True))
+
+
+def history_detail_put(metadata: dict[str, Any]) -> None:
+    now = time.time()
+    with _connect() as db:
+        db.execute(
+            "INSERT INTO history_detail_cache(cache_key,train_type,train_number,year,month,file_path,row_count,file_size,created_at,updated_at,last_accessed,source,source_revision,schema_version) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(cache_key) DO UPDATE SET file_path=excluded.file_path,row_count=excluded.row_count,file_size=excluded.file_size,updated_at=excluded.updated_at,last_accessed=excluded.last_accessed,source=excluded.source,source_revision=excluded.source_revision,schema_version=excluded.schema_version",
+            (metadata["cache_key"], metadata["train_type"], metadata["train_number"], metadata["year"], metadata["month"], metadata["file_path"], metadata["row_count"], metadata["file_size"], now, now, now, metadata["source"], metadata["source_revision"], metadata["schema_version"]),
+        )
+        db.commit()
+
+
+def history_detail_entries() -> list[dict[str, Any]]:
+    with _connect() as db:
+        rows = db.execute("SELECT cache_key,file_path,file_size,last_accessed FROM history_detail_cache ORDER BY last_accessed").fetchall()
+    return [dict(zip(("cache_key", "file_path", "file_size", "last_accessed"), row, strict=True)) for row in rows]
+
+
+def history_detail_delete(cache_key: str) -> None:
+    with _connect() as db:
+        db.execute("DELETE FROM history_detail_cache WHERE cache_key=?", (cache_key,))
+        db.commit()
