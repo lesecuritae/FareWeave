@@ -9,6 +9,10 @@ readme_en = (root / "README.en.md").read_text(encoding="utf-8")
 third_party = (root / "THIRD_PARTY.md").read_text(encoding="utf-8")
 check = (root / "scripts" / "check.sh").read_text(encoding="utf-8")
 container_check = (root / "scripts" / "container-check.sh").read_text(encoding="utf-8")
+app_dockerfile = (root / "tool" / "Dockerfile").read_text(encoding="utf-8")
+db_api_dockerfile = (root / "db-api" / "Dockerfile").read_text(encoding="utf-8")
+db_api_server = (root / "db-api" / "server.mjs").read_text(encoding="utf-8")
+pyproject = (root / "pyproject.toml").read_text(encoding="utf-8")
 installer = root / "install.sh"
 installer_text = installer.read_text(encoding="utf-8")
 license_file = root / "LICENSE"
@@ -33,6 +37,16 @@ assert "STAY22_API_KEY=\n" in env_example
 assert "STAY22_API_KEY=CHANGE_ME" not in env_example
 assert "ghcr.io/lesecuritae/fareweave-app:latest" in compose
 assert "ghcr.io/lesecuritae/fareweave-db-api:latest" in compose
+assert "condition: service_healthy" in compose
+assert 'HISTORY_SNAPSHOT_SCHEDULER_ENABLED: "${HISTORY_SNAPSHOT_SCHEDULER_ENABLED:-true}"' in compose
+assert 'HISTORY_SNAPSHOT_INTERVAL_SECONDS: "${HISTORY_SNAPSHOT_INTERVAL_SECONDS:-86400}"' in compose
+assert "HEALTHCHECK" in app_dockerfile and "/api/health" in app_dockerfile
+assert "HEALTHCHECK" in db_api_dockerfile and "/health" in db_api_dockerfile
+assert "fareweave/0.0.4" in db_api_server and "fareweave/0.0.3" not in db_api_server
+assert 'name = "fareweave"' in pyproject and 'testpaths = ["tests"]' in pyproject
+test_requirements = (root / "tool" / "requirements-test.txt").read_text(encoding="utf-8")
+assert "-r requirements.txt" in test_requirements
+assert "pytest>=8,<9" in test_requirements and "pytest-asyncio" in test_requirements
 assert "## Installation mit Docker" in readme_de
 assert "## Installation with Docker" in readme_en
 assert "docker compose config -q" in readme_de and "docker compose config -q" in readme_en

@@ -2,12 +2,14 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import json
 import os
 import re
 import tempfile
 import threading
 from contextlib import contextmanager
 from dataclasses import dataclass
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -16,7 +18,7 @@ from curl_cffi import requests as curl_requests
 from . import cache
 from .config import (
     HISTORY_CACHE_DIR, HISTORY_CACHE_MAX_GB, HISTORY_MAX_CONCURRENCY,
-    HISTORY_REMOTE_TIMEOUT, HISTORY_SOURCE_REVISION,
+    HISTORY_REMOTE_TIMEOUT, HISTORY_SNAPSHOT_RETENTION_DAYS, HISTORY_SOURCE_REVISION, TZ,
 )
 
 SOURCE = "piebro/deutsche-bahn-data"
@@ -33,6 +35,11 @@ _active: set[str] = set()
 _reading: set[str] = set()
 _guard = threading.Lock()
 _remote_fill_limiter = threading.BoundedSemaphore(max(1, HISTORY_MAX_CONCURRENCY))
+_snapshot_locks: dict[str, threading.Lock] = {}
+_snapshot_locks_guard = threading.Lock()
+_SNAPSHOT_SCHEMA = 1
+_SECRET_KEYS = {"authorization", "cookie", "password", "secret", "token", "api_key", "apikey"}
+_MAX_SNAPSHOT_BYTES = 2 * 1024 * 1024
 
 
 @dataclass(frozen=True)
@@ -45,6 +52,137 @@ class DetailSpec:
     @property
     def month_id(self) -> str:
         return f"{self.year:04d}-{self.month:02d}"
+
+
+def _snapshot_key(snapshot_id: str) -> str:
+    value = str(snapshot_id).strip()
+    if not value or len(value) > 160 or not re.fullmatch(r"[A-Za-z0-9._:-]+", value):
+        raise ValueError("invalid history snapshot id")
+    label = re.sub(r"[^A-Za-z0-9._-]+", "_", value)[:48]
+    return f"{label}-{hashlib.sha256(value.encode()).hexdigest()[:16]}"
+
+
+def _snapshot_root(snapshot_id: str) -> Path:
+    root = (Path(HISTORY_CACHE_DIR).resolve() / "snapshots").resolve()
+    target = root / _snapshot_key(snapshot_id)
+    if root not in target.resolve(strict=False).parents:
+        raise ValueError("history snapshot path escapes configured root")
+    return target
+
+
+def _snapshot_lock(snapshot_id: str) -> threading.Lock:
+    key = _snapshot_key(snapshot_id)
+    with _snapshot_locks_guard:
+        return _snapshot_locks.setdefault(key, threading.Lock())
+
+
+def _validate_snapshot_payload(value: Any, path: tuple[str, ...] = ()) -> None:
+    if isinstance(value, dict):
+        for key, item in value.items():
+            normalized = re.sub(r"[^a-z0-9]+", "_", str(key).casefold()).strip("_")
+            if normalized in _SECRET_KEYS or any(part in _SECRET_KEYS for part in normalized.split("_")):
+                raise ValueError(f"secret-like field is not allowed in history snapshots: {'.'.join((*path, str(key)))}")
+            _validate_snapshot_payload(item, (*path, str(key)))
+    elif isinstance(value, (list, tuple)):
+        for index, item in enumerate(value):
+            _validate_snapshot_payload(item, (*path, str(index)))
+    elif value is not None and not isinstance(value, (str, int, float, bool)):
+        raise TypeError(f"history snapshot value is not JSON-safe at {'.'.join(path)}")
+
+
+def prune_daily_snapshots(*, today: date | None = None) -> int:
+    """Keep the current day plus the previous retention-1 calendar days."""
+    snapshots_root = Path(HISTORY_CACHE_DIR).resolve() / "snapshots"
+    if not snapshots_root.is_dir() or snapshots_root.is_symlink():
+        return 0
+    cutoff = (today or datetime.now(TZ).date()) - timedelta(days=HISTORY_SNAPSHOT_RETENTION_DAYS - 1)
+    removed = 0
+    for path in snapshots_root.glob("*/*.json"):
+        try:
+            snapshot_day = date.fromisoformat(path.stem)
+        except ValueError:
+            continue
+        if snapshot_day >= cutoff or path.is_symlink():
+            continue
+        try:
+            path.unlink()
+            removed += 1
+        except FileNotFoundError:
+            pass
+    return removed
+
+
+def save_daily_snapshot(
+    snapshot_id: str, payload: dict[str, Any], *, observed_at: datetime | None = None,
+) -> Path:
+    """Atomically store one JSON-safe, secret-free observation per local calendar day."""
+    if not isinstance(payload, dict):
+        raise TypeError("history snapshot payload must be an object")
+    _validate_snapshot_payload(payload)
+    observed = observed_at or datetime.now(TZ)
+    if observed.tzinfo is None:
+        observed = observed.replace(tzinfo=TZ)
+    observed = observed.astimezone(TZ)
+    document = {
+        "schema_version": _SNAPSHOT_SCHEMA, "snapshot_id": snapshot_id,
+        "snapshot_date": observed.date().isoformat(), "observed_at": observed.isoformat(),
+        "payload": payload,
+    }
+    encoded = json.dumps(document, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    if len(encoded) > _MAX_SNAPSHOT_BYTES:
+        raise ValueError("history snapshot exceeds size limit")
+    directory = _snapshot_root(snapshot_id)
+    target = directory / f"{observed.date().isoformat()}.json"
+    with _snapshot_lock(snapshot_id):
+        directory.mkdir(parents=True, exist_ok=True)
+        if directory.is_symlink():
+            raise RuntimeError("unsafe_history_snapshot_path")
+        fd, temporary_name = tempfile.mkstemp(prefix=f".{target.name}.", suffix=".tmp", dir=directory)
+        temporary = Path(temporary_name)
+        try:
+            with os.fdopen(fd, "wb") as output:
+                output.write(encoded)
+                output.flush()
+                os.fsync(output.fileno())
+            os.replace(temporary, target)
+            directory_fd = os.open(directory, os.O_RDONLY)
+            try:
+                os.fsync(directory_fd)
+            finally:
+                os.close(directory_fd)
+        finally:
+            temporary.unlink(missing_ok=True)
+    prune_daily_snapshots(today=observed.date())
+    return target
+
+
+def load_daily_snapshots(
+    snapshot_id: str, *, start_date: date | None = None, end_date: date | None = None,
+    today: date | None = None,
+) -> list[dict[str, Any]]:
+    prune_daily_snapshots(today=today)
+    directory = _snapshot_root(snapshot_id)
+    if not directory.is_dir() or directory.is_symlink():
+        return []
+    output: list[dict[str, Any]] = []
+    with _snapshot_lock(snapshot_id):
+        for path in sorted(directory.glob("*.json")):
+            try:
+                snapshot_day = date.fromisoformat(path.stem)
+                if (start_date and snapshot_day < start_date) or (end_date and snapshot_day > end_date):
+                    continue
+                document = json.loads(path.read_text(encoding="utf-8"))
+                if (
+                    not isinstance(document, dict) or document.get("schema_version") != _SNAPSHOT_SCHEMA
+                    or document.get("snapshot_id") != snapshot_id or document.get("snapshot_date") != path.stem
+                    or not isinstance(document.get("payload"), dict)
+                ):
+                    raise ValueError("invalid history snapshot document")
+                _validate_snapshot_payload(document["payload"])
+                output.append(document)
+            except (OSError, UnicodeError, ValueError, TypeError, json.JSONDecodeError):
+                path.unlink(missing_ok=True)
+    return output
 
 
 def detail_cache_key(spec: DetailSpec) -> str:
@@ -132,7 +270,7 @@ def _download_month(url: str, directory: Path) -> Path:
     try:
         response = curl_requests.get(
             url,
-            headers={"User-Agent": "FareWeave/0.0.3"},
+            headers={"User-Agent": "FareWeave/0.0.4"},
             impersonate="firefox",
             timeout=HISTORY_REMOTE_TIMEOUT,
             allow_redirects=True,

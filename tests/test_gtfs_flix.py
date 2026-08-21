@@ -10,7 +10,10 @@ from types import SimpleNamespace
 
 os.environ.setdefault("FLIX_GTFS_DIR", "/tmp/fareweave-test-gtfs")
 
-from reisevergleich.gtfs_flix import _build_database, _search_sync, enrich_live_prices, gtfs_seconds, service_active, stop_score
+from reisevergleich.gtfs_flix import (
+    _build_database, _search_sync, enrich_live_prices, gtfs_local_datetime,
+    gtfs_seconds, service_active, stop_score,
+)
 
 
 assert gtfs_seconds("24:15:00") == 87300
@@ -34,6 +37,12 @@ assert stop_score("Leipzig Hbf", "Leipzig central train station") >= 75
 assert stop_score("BERLIN", "Berlin central bus station") >= 75
 assert stop_score("Frankfurt", "Frankfurt am Main Hbf") >= 75
 assert stop_score("Dortmund", "Dresden") == 0
+
+# Transitous' Flix feed uses UTC stop_times. Conversion to Europe/Berlin must
+# follow DST without applying a fixed offset.
+assert gtfs_local_datetime(date(2026, 8, 24), gtfs_seconds("09:04:00"), "UTC").isoformat() == "2026-08-24T11:04:00+02:00"
+assert gtfs_local_datetime(date(2026, 1, 12), gtfs_seconds("09:04:00"), "UTC").isoformat() == "2026-01-12T10:04:00+01:00"
+assert gtfs_local_datetime(date(2026, 8, 24), gtfs_seconds("09:04:00"), "Europe/Berlin").isoformat() == "2026-08-24T09:04:00+02:00"
 
 
 def csv_bytes(fieldnames, rows):
@@ -108,3 +117,19 @@ assert enriched["provider_status"]["live_pricing"]["matched_prices"] == 1
 ambiguous = {**live, "candidate_routes": live["candidate_routes"] * 2}
 schedule["candidate_routes"][0]["price"] = None
 assert enrich_live_prices(schedule, ambiguous)["candidate_routes"][0]["price"] is None
+
+for service_day, gtfs_time, live_time in (
+    (date(2026, 8, 24), "09:04:00", "2026-08-24T11:04:00+02:00"),
+    (date(2026, 1, 12), "09:04:00", "2026-01-12T10:04:00+01:00"),
+):
+    normalized = gtfs_local_datetime(service_day, gtfs_seconds(gtfs_time), "UTC").isoformat()
+    winter_or_summer_schedule = {
+        "candidate_routes": [{"departure": normalized, "arrival": normalized, "flix_kind": "train", "price": None}],
+        "routes": [{}], "provider_status": {"ok": True},
+    }
+    winter_or_summer_live = {
+        "candidate_routes": [{"departure": {"time": live_time}, "arrival": {"time": live_time}, "flix_kind": "train", "price": 12.49}],
+        "provider_status": {"ok": True},
+    }
+    matched = enrich_live_prices(winter_or_summer_schedule, winter_or_summer_live)
+    assert matched["candidate_routes"][0]["price"] == 12.49, matched

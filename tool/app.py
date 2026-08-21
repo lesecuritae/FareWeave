@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI
@@ -10,9 +11,19 @@ from fastapi.staticfiles import StaticFiles
 from db_cffi_bridge import router as db_cffi_router
 from reisevergleich import router as reisevergleich_router
 from reisevergleich.config import APP_VERSION
+from reisevergleich.history_scheduler import start_scheduler, stop_scheduler
 
 ROOT = Path(__file__).resolve().parent
 UI = ROOT / "ui"
+
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    scheduler = start_scheduler()
+    try:
+        yield
+    finally:
+        await stop_scheduler(scheduler)
 
 app = FastAPI(
     title="FareWeave",
@@ -21,6 +32,7 @@ app = FastAPI(
         "Deterministischer multimodaler Reisevergleich mit DB/db-vendo, Split-Ticket-Prüfung, "
         "Transitous, Flix und trvl."
     ),
+    lifespan=lifespan,
 )
 app.include_router(reisevergleich_router)
 app.include_router(db_cffi_router)
