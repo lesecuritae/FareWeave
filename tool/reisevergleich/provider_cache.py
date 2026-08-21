@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from typing import Any
 
 from .cache import cached_call
@@ -37,7 +38,16 @@ async def transitous_search(request, *, deutschlandticket_only: bool = False):
 
 
 async def flix_search(request):
-    return await cached_call("gtfs.flix", _key(request), FLIX_TTL, lambda: gtfs_flix.search(request))
+    async def combined():
+        schedule, live = await asyncio.gather(
+            gtfs_flix.search(request), raw_trvl.flix_search(request), return_exceptions=True,
+        )
+        if isinstance(schedule, BaseException):
+            return {"status": "failed", "routes": [], "candidate_routes": [], "provider_status": {"provider": "flix-gtfs", "ok": False, "error": f"{type(schedule).__name__}: {schedule}"}}
+        if isinstance(live, BaseException):
+            live = {"routes": [], "provider_status": {"provider": "flix-api", "ok": False, "error": f"{type(live).__name__}: {live}"}}
+        return gtfs_flix.enrich_live_prices(schedule, live)
+    return await cached_call("gtfs.flix-with-live-prices", _key(request), FLIX_TTL, combined)
 
 
 async def flight_search(request):

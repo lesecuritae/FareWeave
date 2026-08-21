@@ -10,7 +10,7 @@ from types import SimpleNamespace
 
 os.environ.setdefault("FLIX_GTFS_DIR", "/tmp/fareweave-test-gtfs")
 
-from reisevergleich.gtfs_flix import _build_database, _search_sync, gtfs_seconds, service_active, stop_score
+from reisevergleich.gtfs_flix import _build_database, _search_sync, enrich_live_prices, gtfs_seconds, service_active, stop_score
 
 
 assert gtfs_seconds("24:15:00") == 87300
@@ -98,3 +98,13 @@ with tempfile.TemporaryDirectory() as temporary:
     assert all(route["provider"] == "FlixTrain" for route in trains["routes"])
 
 print("gtfs flix: OK")
+
+schedule = {"candidate_routes": [{"departure": "2026-08-24T14:00:00+02:00", "arrival": "2026-08-24T17:00:00+02:00", "flix_kind": "bus", "price": None}], "routes": [{}], "provider_status": {"ok": True}}
+live = {"candidate_routes": [{"departure": {"time": "2026-08-24T14:00:00+02:00"}, "arrival": {"time": "2026-08-24T17:00:00+02:00"}, "flix_kind": "bus", "price": 19.99, "currency": "EUR", "booking_url": "https://shop.flixbus.com/search"}], "provider_status": {"ok": True}}
+enriched = enrich_live_prices(schedule, live)
+assert enriched["candidate_routes"][0]["price"] == 19.99
+assert enriched["provider_status"]["live_pricing"]["matched_prices"] == 1
+
+ambiguous = {**live, "candidate_routes": live["candidate_routes"] * 2}
+schedule["candidate_routes"][0]["price"] = None
+assert enrich_live_prices(schedule, ambiguous)["candidate_routes"][0]["price"] is None

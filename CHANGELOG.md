@@ -5,6 +5,7 @@
 - GTFS-Zeiten über 24 Uhr, Europe/Berlin-Ausgabe, Nachtfahrten, allgemeines Haltestellenmatching und strukturierte Agency-/Route-Type-Klassifikation sind abgedeckt.
 - Feed-Updates erfolgen täglich mit bedingtem Download, vollständiger Validierung und atomarem Datenbanktausch; bei Updatefehlern bleibt der letzte gültige Feed aktiv.
 - GTFS-Verbindungen erfinden keine Preise und werden nie als Deutschlandticket-abgedeckt markiert.
+- Echte Preise aus der Flix-Such-API werden nur bei einer eindeutigen Übereinstimmung von Verkehrsmittel, Abfahrt und Ankunft an eine GTFS-Fahrt angefügt; sonst bleibt der Preis offen.
 - Das starre 10er-Limit wurde durch standardmäßig 24 und maximal 48 Verbindungen ersetzt; die sichtbare Liste ist chronologisch.
 - Kalender, mobile Karten und nicht-sticky Mobile-Navigation wurden überarbeitet.
 - Ein requestisolierter Live-Loader zeigt echte Zustände von DB, Transitous, GTFS, FlixBus, FlixTrain und Ergebnisaufbereitung.

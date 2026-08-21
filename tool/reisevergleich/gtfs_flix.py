@@ -20,6 +20,7 @@ import httpx
 
 from .config import FLIX_GTFS_DIR, FLIX_GTFS_MAX_AGE, FLIX_GTFS_TIMEOUT, FLIX_GTFS_URL, TRANSITOUS_USER_AGENT, TZ
 from .db import rank_routes
+from .utils import as_float, parse_datetime
 
 LOG = logging.getLogger(__name__)
 REQUIRED = {"agency.txt", "routes.txt", "trips.txt", "stops.txt", "stop_times.txt", "calendar.txt", "calendar_dates.txt"}
@@ -253,3 +254,45 @@ async def discover_stops(origin: str, destination: str) -> dict[str, Any]:
         return {"origin_stops": origin_stops, "destination_stops": destination_stops, "source": "flix-gtfs"}
     except Exception as exc:
         return {"origin_stops": [], "destination_stops": [], "source": "flix-gtfs", "error": f"{type(exc).__name__}: {exc}"}
+
+
+def enrich_live_prices(schedule: dict[str, Any], live: dict[str, Any]) -> dict[str, Any]:
+    """Attach a Flix API fare only to one unambiguous matching GTFS journey."""
+    def route_time(route: dict[str, Any], side: str):
+        value = route.get(side)
+        if isinstance(value, dict): value = value.get("time")
+        return parse_datetime(value)
+
+    live_routes = live.get("candidate_routes") or live.get("routes") or []
+    by_match: dict[tuple[str, str, str], list[dict[str, Any]]] = {}
+    for route in live_routes:
+        departure, arrival = route_time(route, "departure"), route_time(route, "arrival")
+        price = as_float(route.get("price"))
+        kind = str(route.get("flix_kind") or route.get("type") or "").casefold()
+        if not departure or not arrival or price <= 0 or kind not in {"bus", "train"}:
+            continue
+        key = (kind, departure.astimezone(TZ).isoformat(timespec="minutes"), arrival.astimezone(TZ).isoformat(timespec="minutes"))
+        by_match.setdefault(key, []).append(route)
+
+    enriched = 0
+    candidates = schedule.get("candidate_routes") or []
+    for route in candidates:
+        departure, arrival = route_time(route, "departure"), route_time(route, "arrival")
+        if not departure or not arrival: continue
+        key = (str(route.get("flix_kind") or "").casefold(), departure.astimezone(TZ).isoformat(timespec="minutes"), arrival.astimezone(TZ).isoformat(timespec="minutes"))
+        matches = by_match.get(key) or []
+        if len(matches) != 1: continue
+        match = matches[0]
+        route["price"] = round(as_float(match.get("price")), 2)
+        route["currency"] = match.get("currency") or "EUR"
+        route["price_complete"] = True
+        route["price_note"] = "Livepreis aus der Flix-Such-API; vor Buchung erneut prüfen."
+        if match.get("booking_url"): route["booking_url"] = match["booking_url"]
+        enriched += 1
+    schedule["routes"] = candidates[: len(schedule.get("routes") or [])]
+    schedule.setdefault("provider_status", {})["live_pricing"] = {
+        "provider": "flix-api", "ok": (live.get("provider_status") or {}).get("ok") is True,
+        "matched_prices": enriched, "candidate_prices": sum(len(items) for items in by_match.values()),
+        "error": (live.get("provider_status") or {}).get("error"),
+    }
+    return schedule

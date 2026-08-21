@@ -74,7 +74,7 @@ A provider may fail or time out without automatically taking down the entire sea
 
 FlixTrain and FlixBus can be included directly in the same comparison. A DB connection is therefore compared not only with another DB ticket but also with alternative long-distance services.
 
-Timetable connections come from Transitous' European Flix GTFS feed. FareWeave evaluates service calendars and exceptions itself, supports overnight times beyond 24:00, and distinguishes buses from trains using structured agency and route-type data. Since GTFS does not contain live fares, the price remains explicitly unknown unless a reliable separate source supplies it.
+Timetable connections come from Transitous' European Flix GTFS feed. FareWeave evaluates service calendars and exceptions itself, supports overnight times beyond 24:00, and distinguishes buses from trains using structured agency and route-type data. Real prices from the Flix search API are attached only when times match unambiguously; otherwise the price remains explicitly unknown.
 
 FareWeave can also use Flix in mixed journey chains. One example is a local section covered by the Deutschlandticket, followed by a paid Flix section and another D-Ticket section.
 

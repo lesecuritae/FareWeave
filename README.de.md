@@ -74,7 +74,7 @@ Ein Provider kann ausfallen oder einen Timeout produzieren, ohne automatisch die
 
 FlixTrain und FlixBus können direkt in denselben Vergleich einbezogen werden. Damit steht eine DB-Verbindung nicht nur gegen ein anderes DB-Ticket, sondern auch gegen alternative Fernverkehrsangebote.
 
-Die Fahrplanverbindungen stammen aus dem europäischen Flix-GTFS bei Transitous. FareWeave wertet Servicekalender und Ausnahmetage selbst aus, unterstützt Nachtzeiten über 24 Uhr und trennt Bus und Zug über strukturierte Agency- und Route-Type-Daten. Da GTFS keine Livepreise enthält, bleibt der Preis ohne separate belastbare Quelle ausdrücklich offen.
+Die Fahrplanverbindungen stammen aus dem europäischen Flix-GTFS bei Transitous. FareWeave wertet Servicekalender und Ausnahmetage selbst aus, unterstützt Nachtzeiten über 24 Uhr und trennt Bus und Zug über strukturierte Agency- und Route-Type-Daten. Echte Preise aus der Flix-Such-API werden nur bei einer eindeutigen zeitlichen Übereinstimmung angefügt; andernfalls bleibt der Preis ausdrücklich offen.
 
 FareWeave kann Flix außerdem in gemischten Reiseketten verwenden. Ein Beispiel wäre eine mit dem Deutschlandticket abgedeckte Nahverkehrsstrecke, ein bezahlter Flix-Abschnitt und anschließend wieder eine D-Ticket-Strecke.
 
