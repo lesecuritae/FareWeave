@@ -12,11 +12,15 @@ def _env_bool(name: str, default: bool) -> bool:
     if value is None:
         return default
     return value.strip().lower() in {"1", "true", "yes", "on"}
-APP_VERSION = "0.0.3"
+APP_VERSION = "0.0.4"
 DB_API_URL = os.getenv("DB_API_URL", "http://db-api:3001").rstrip("/")
 TRANSITOUS_URL = os.getenv("TRANSITOUS_URL", "https://api.transitous.org").rstrip("/")
-TRANSITOUS_USER_AGENT = os.getenv("TRANSITOUS_USER_AGENT", "fareweave/0.0.3")
+TRANSITOUS_USER_AGENT = os.getenv("TRANSITOUS_USER_AGENT", "fareweave/0.0.4")
 TRVL_BIN = os.getenv("TRVL_BIN", "trvl")
+FLIX_GTFS_URL = os.getenv("FLIX_GTFS_URL", "https://api.transitous.org/gtfs/eu_flixbus.gtfs.zip")
+FLIX_GTFS_DIR = os.getenv("FLIX_GTFS_DIR", "/var/lib/reisevergleich/flix-gtfs")
+FLIX_GTFS_MAX_AGE = min(max(int(os.getenv("FLIX_GTFS_MAX_AGE", "86400")), 3600), 604800)
+FLIX_GTFS_TIMEOUT = min(max(int(os.getenv("FLIX_GTFS_TIMEOUT", "30")), 10), 120)
 
 # Harte Obergrenzen pro externer Quelle. Kein einzelner Anbieter darf die
 # Gesamtreise blockieren. Die Werte bleiben absichtlich deutlich unter dem

@@ -23,7 +23,7 @@ services:
     container_name: fareweave-db-api
     environment:
       PORT: "3001"
-      USER_AGENT: fareweave/0.0.3
+      USER_AGENT: fareweave/0.0.4
       DB_CFFI_BRIDGE_URL: http://app:8000/internal/db-cffi/request
       DB_CFFI_TOKEN: "${DB_CFFI_TOKEN:-}"
       DB_CFFI_TOKEN_FILE: /run/fareweave-secrets/db_cffi_token
@@ -82,6 +82,10 @@ services:
       TRVL_PROVIDER_TIMEOUT: "8s"
       GROUND_PROVIDER_TIMEOUT: "22"
       GROUND_PROVIDER_CONCURRENCY: "2"
+      FLIX_GTFS_URL: "https://api.transitous.org/gtfs/eu_flixbus.gtfs.zip"
+      FLIX_GTFS_DIR: /var/lib/reisevergleich/flix-gtfs
+      FLIX_GTFS_MAX_AGE: "86400"
+      FLIX_GTFS_TIMEOUT: "30"
       TRANSFER_PROVIDER_TIMEOUT: "20"
       TRANSFER_PROVIDER_CONCURRENCY: "2"
       TRANSITOUS_TIMEOUT: "25"

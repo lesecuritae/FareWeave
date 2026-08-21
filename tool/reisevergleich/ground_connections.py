@@ -82,6 +82,9 @@ def complete_connections(
             if item.get(key) in (None, "", []) and value not in (None, "", []):
                 item[key] = value
         labels = item["labels"]
+        provider = str(item.get("provider") or "").strip()
+        if provider and provider not in labels:
+            labels.append(provider)
         if covered:
             item["deutschlandticket_covered"] = True
             item["additional_ticket_cost"] = 0.0

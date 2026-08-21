@@ -8,7 +8,7 @@
 
 Rail, the Deutschlandticket, split tickets, FlixTrain, FlixBus, flights, airport feeders, transfers, and accommodation are combined into a single itinerary. FareWeave does not merely look for a low price somewhere. Every part of the journey must fit together both chronologically and logically.
 
-Current version: **0.0.3**
+Current version: **0.0.4**
 
 FareWeave does not sell or book anything itself. If a provider supplies a usable offer link, it can be opened directly from the result. Where no direct link is available, FareWeave offers a suitable manual cross-check, for example with Deutsche Bahn, Google Flights, Google Hotels, or Google Maps. Price and availability must always be verified with the actual provider.
 
@@ -74,6 +74,8 @@ A provider may fail or time out without automatically taking down the entire sea
 
 FlixTrain and FlixBus can be included directly in the same comparison. A DB connection is therefore compared not only with another DB ticket but also with alternative long-distance services.
 
+Timetable connections come from Transitous' European Flix GTFS feed. FareWeave evaluates service calendars and exceptions itself, supports overnight times beyond 24:00, and distinguishes buses from trains using structured agency and route-type data. Since GTFS does not contain live fares, the price remains explicitly unknown unless a reliable separate source supplies it.
+
 FareWeave can also use Flix in mixed journey chains. One example is a local section covered by the Deutschlandticket, followed by a paid Flix section and another D-Ticket section.
 
 When the actual Flix stop differs from the requested station, FareWeave can include suitable access and egress legs. The interface defaults to automatic stop selection; alternatively, a concrete stop currently returned by the provider can be selected and enforced.
@@ -96,11 +98,11 @@ trvl supplies data in selected places. FareWeave then applies deterministic rule
 
 Flight providers are queried separately and have their own time limits. A slow or broken provider must not block the entire journey plan.
 
-FareWeave 0.0.3 first queries **Skiplagged, Ryanair, Vueling, and easyJet**. If those results are insufficient, it continues with **Transavia, Norwegian, Air France/KLM, and Wizz Air**.
+FareWeave 0.0.4 first queries **Skiplagged, Ryanair, Vueling, and easyJet**. If those results are insufficient, it continues with **Transavia, Norwegian, Air France/KLM, and Wizz Air**.
 
 The aggregated trvl request is not passed through without limits. FareWeave queries the required providers in isolation, combines usable results, and rejects chronologically implausible flights.
 
-Google Flights is also included as a manual cross-check. In FareWeave 0.0.3 it is **not a separate automated Google Flights provider**, but a suitable search link for the requested route and travel dates.
+Google Flights is also included as a manual cross-check. In FareWeave 0.0.4 it is **not a separate automated Google Flights provider**, but a suitable search link for the requested route and travel dates.
 
 ## Transfers and public transport
 
@@ -342,7 +344,7 @@ docker compose build
 docker compose up -d
 ```
 
-trvl is pinned through `TRVL_REF`; FareWeave 0.0.3 uses `v1.21.4` by default.
+trvl is pinned through `TRVL_REF`; FareWeave 0.0.4 uses `v1.21.4` by default.
 
 ## Quality assurance
 

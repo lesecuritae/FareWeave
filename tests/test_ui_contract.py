@@ -55,7 +55,12 @@ print("UI-Vertrag: OK")
 assert "3 sinnvolle" not in html
 assert "maxResults" not in html
 assert "journey_type: state.journeyType" in js
-assert "max_results: 10" in js
+assert "max_results: 24" in js
+assert "position:static" in css
+assert 'id="searchProgress"' in html
+assert "X-Search-ID" in js
+assert "controller.abort()" in js
+assert "progressLabels" in js and "GTFS-Fahrplan" in js and "Ergebnisaufbereitung" in js
 assert "flix_origin_stop_id:" in js and "flix_destination_stop_id:" in js
 assert "Automatisch" in html and "/api/flix-stops" in js
 

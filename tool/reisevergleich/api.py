@@ -4,14 +4,16 @@ import asyncio
 from typing import Any
 
 import httpx
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Header, HTTPException, Query
 
 from .airports import AIRPORT_CITY_NAMES, AIRPORT_STATIONS
 from .cache import health as cache_health
 from .config import APP_VERSION, DB_API_URL, TRANSITOUS_URL, TRANSITOUS_USER_AGENT, today_iso
 from .models import ReiseRequest, TripRequest
 from .service import search
-from .trvl import capability_report, discover_flix_stops
+from .progress import begin as begin_progress, end as end_progress, get as get_progress, valid_search_id
+from .gtfs_flix import discover_stops as discover_gtfs_flix_stops
+from .trvl import capability_report
 
 router = APIRouter()
 
@@ -21,8 +23,31 @@ router = APIRouter()
     operation_id="search_trip",
     summary="Reise deterministisch suchen und vergleichen",
 )
-async def search_trip(request: TripRequest) -> dict[str, Any]:
-    return await search(request)
+async def search_trip(request: TripRequest, x_search_id: str | None = Header(default=None)) -> dict[str, Any]:
+    search_id = valid_search_id(x_search_id)
+    if not search_id:
+        return await search(request)
+    token = begin_progress(search_id)
+    try:
+        result = await search(request)
+        end_progress(token, status="completed")
+        return result
+    except BaseException as exc:
+        end_progress(token, status="cancelled" if isinstance(exc, asyncio.CancelledError) else "failed")
+        raise
+
+
+@router.get("/api/search-status/{search_id}")
+async def search_status(search_id: str) -> dict[str, Any]:
+    normalized = valid_search_id(search_id)
+    result = get_progress(normalized) if normalized else None
+    if not result: raise HTTPException(status_code=404, detail="Unbekannte oder abgelaufene Suche")
+    return result
+
+
+@router.get("/api/flix-stops")
+async def flix_stops(origin: str = Query(min_length=1), destination: str = Query(min_length=1)) -> dict[str, Any]:
+    return await discover_gtfs_flix_stops(origin, destination)
 
 
 @router.get("/api/config")
@@ -36,7 +61,7 @@ async def config() -> dict[str, Any]:
             "hotel_property_type": "hotel",
             "hotel_min_stars": 3,
             "airport_buffer_minutes": 120,
-            "max_results": 10,
+            "max_results": 24,
         },
         "airport_cities": AIRPORT_CITY_NAMES,
         "airport_stations": AIRPORT_STATIONS,

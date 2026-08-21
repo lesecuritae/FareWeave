@@ -7,15 +7,68 @@ const state = {
   hotelType: 'hotel',
 };
 
+function localIso(value) {
+  return `${value.getFullYear()}-${String(value.getMonth()+1).padStart(2,'0')}-${String(value.getDate()).padStart(2,'0')}`;
+}
+
+let calendarMonth = new Date();
+let activeSearch = null;
+const progressLabels = {db:'Deutsche Bahn', transitous:'Transitous', gtfs:'GTFS-Fahrplan', flixbus:'FlixBus', flixtrain:'FlixTrain', merge:'Ergebnisaufbereitung'};
+const statusLabels = {waiting:'wartet', loading:'wird geladen', processing:'wird verarbeitet', completed:'abgeschlossen', empty:'keine Ergebnisse', failed:'fehlgeschlagen', cancelled:'abgebrochen'};
+
+function renderProgress(data={}) {
+  const steps = data.steps || {};
+  $('progressSteps').innerHTML = Object.entries(progressLabels).map(([key,label]) => {
+    const step = steps[key] || {status:'waiting'};
+    return `<div class="progress-step ${esc(step.status)}"><span class="progress-dot" aria-hidden="true"></span><strong>${esc(label)}</strong><span>${esc(statusLabels[step.status] || step.status)}</span>${step.detail ? `<small>${esc(step.detail)}</small>` : ''}</div>`;
+  }).join('');
+  $('progressSummary').textContent = data.status === 'completed' ? 'Abgeschlossen' : data.status === 'failed' ? 'Mit Fehlern beendet' : 'Suche läuft';
+}
+
+async function pollProgress(search) {
+  while (activeSearch === search && !search.done) {
+    try {
+      const response = await fetch(`/api/search-status/${encodeURIComponent(search.id)}`, {signal: search.controller.signal});
+      if (response.ok && activeSearch === search) renderProgress(await response.json());
+    } catch (error) { if (error.name === 'AbortError') return; }
+    await new Promise(resolve => setTimeout(resolve, 350));
+  }
+}
+
+function renderCalendar() {
+  const selected = $('departureDate').value;
+  const minimum = $('departureDate').min;
+  $('calendarMonth').textContent = new Intl.DateTimeFormat('de-DE', {month:'long', year:'numeric'}).format(calendarMonth);
+  const first = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth(), 1);
+  const offset = (first.getDay() + 6) % 7;
+  const days = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + 1, 0).getDate();
+  const buttons = [];
+  for (let empty = 0; empty < offset; empty++) buttons.push('<span></span>');
+  for (let day = 1; day <= days; day++) {
+    const value = localIso(new Date(calendarMonth.getFullYear(), calendarMonth.getMonth(), day));
+    buttons.push(`<button type="button" data-calendar-date="${value}" class="${value===selected?'selected':''}" ${value<minimum?'disabled':''} aria-pressed="${value===selected}">${day}</button>`);
+  }
+  $('calendarDays').innerHTML = buttons.join('');
+  $('calendarDays').querySelectorAll('[data-calendar-date]').forEach(button => button.addEventListener('click', () => {
+    $('departureDate').value = button.dataset.calendarDate;
+    syncJourneyDates(); refreshFlixStops(); renderCalendar();
+    $('calendarPanel').classList.add('hidden'); $('calendarToggle').setAttribute('aria-expanded', 'false');
+  }));
+  const current = new Date();
+  $('calendarPrevious').disabled = calendarMonth.getFullYear() === current.getFullYear() && calendarMonth.getMonth() === current.getMonth();
+}
+
 function setTodayDefaults() {
   const now = new Date();
   const departure = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 35);
-  const iso = departure.toISOString().slice(0, 10);
+  const iso = localIso(departure);
   $('departureDate').value = iso;
-  $('departureDate').min = new Date().toISOString().slice(0, 10);
+  $('departureDate').min = localIso(now);
   const ret = new Date(departure.getFullYear(), departure.getMonth(), departure.getDate() + 7);
-  $('returnDate').value = ret.toISOString().slice(0, 10);
+  $('returnDate').value = localIso(ret);
   $('returnDate').min = iso;
+  calendarMonth = new Date(departure.getFullYear(), departure.getMonth(), 1);
+  renderCalendar();
 }
 
 function dateDifferenceInDays(start, end) {
@@ -140,7 +193,7 @@ function getPayload() {
     hotel_min_stars: hotelUsesStars ? Number(document.getElementById('hotelStars').value) : 0,
     airport_buffer_minutes: Number($('airportBuffer').value),
     stops: $('stops').value,
-    max_results: 10,
+    max_results: 24,
     refresh_cache: $('refreshCache').checked,
   };
 }
@@ -348,28 +401,39 @@ function render(data) {
 
 async function submit(ev) {
   ev.preventDefault();
+  if (activeSearch) activeSearch.controller.abort();
+  const search = {id: `fw_${Date.now()}_${crypto.getRandomValues(new Uint32Array(1))[0].toString(36)}`, controller: new AbortController(), done:false};
+  activeSearch = search;
   hideMessage();
   $('results').className = 'results hidden';
   const btn = $('searchButton');
-  btn.disabled = true;
-  btn.innerHTML = '<span class="spinner"></span>Suche läuft';
+  btn.innerHTML = '<span class="spinner"></span>Suche aktualisieren';
   $('statusBadge').textContent = 'Suche läuft';
+  $('searchProgress').classList.remove('hidden');
+  renderProgress();
+  pollProgress(search);
   try {
     const res = await fetch('/api/search', {
       method: 'POST',
-      headers: {'Content-Type':'application/json'},
+      headers: {'Content-Type':'application/json', 'X-Search-ID':search.id},
       body: JSON.stringify(getPayload()),
+      signal: search.controller.signal,
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.detail ? JSON.stringify(data.detail) : `HTTP ${res.status}`);
+    if (activeSearch !== search) return;
     render(data);
     $('statusBadge').textContent = data.cache?.journey_hit ? 'Cache' : 'Live';
   } catch (err) {
+    if (err.name === 'AbortError') return;
     showMessage(`Suche fehlgeschlagen: ${err.message}`, 'error');
     $('statusBadge').textContent = 'Fehler';
   } finally {
+    search.done = true;
+    if (activeSearch !== search) return;
     btn.disabled = false;
     btn.textContent = 'Verbindungen finden';
+    $('searchProgress').classList.add('hidden');
   }
 }
 
@@ -393,6 +457,13 @@ function bind() {
     syncHotelType();
   }));
   $('departureDate').addEventListener('change', () => { syncJourneyDates(); refreshFlixStops(); });
+  $('calendarToggle').addEventListener('click', () => {
+    const panel = $('calendarPanel'); panel.classList.toggle('hidden');
+    $('calendarToggle').setAttribute('aria-expanded', String(!panel.classList.contains('hidden')));
+    renderCalendar();
+  });
+  $('calendarPrevious').addEventListener('click', () => { calendarMonth = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth()-1, 1); renderCalendar(); });
+  $('calendarNext').addEventListener('click', () => { calendarMonth = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth()+1, 1); renderCalendar(); });
   $('departureAfter').addEventListener('change', refreshFlixStops);
   $('origin').addEventListener('blur', refreshFlixStops);
   $('destination').addEventListener('blur', refreshFlixStops);

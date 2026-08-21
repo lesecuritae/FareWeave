@@ -40,6 +40,16 @@ button { cursor: pointer; }
 .field input:focus, .field select:focus { border-color:#6a7890; box-shadow:0 0 0 3px rgba(106,120,144,.18); }
 .date-grid { margin-top:16px; display:grid; grid-template-columns:minmax(0, 1fr) minmax(180px, .55fr); grid-template-areas:"departure time" "return one-way"; gap:12px; align-items:end; }
 .departure-field { grid-area:departure; }
+.date-input-row { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:8px; }
+.calendar-toggle, .calendar-head button { min-height:44px; border:1px solid #bfd1d6; border-radius:10px; background:white; color:var(--navy); font-weight:800; padding:0 12px; }
+.calendar-panel { margin-top:4px; padding:12px; border:1px solid var(--line); border-radius:13px; background:white; box-shadow:var(--shadow); }
+.calendar-head { display:grid; grid-template-columns:44px 1fr 44px; align-items:center; text-align:center; gap:8px; }
+.calendar-weekdays, .calendar-days { display:grid; grid-template-columns:repeat(7,minmax(32px,1fr)); gap:4px; margin-top:8px; text-align:center; }
+.calendar-weekdays span { padding:6px 0; color:var(--muted); font-size:16px; font-weight:800; }
+.calendar-days button { min-height:42px; border:1px solid transparent; border-radius:9px; background:var(--panel-2); color:var(--text); }
+.calendar-days button:hover:not(:disabled) { border-color:var(--accent); }
+.calendar-days button.selected { background:var(--navy); color:white; font-weight:900; }
+.calendar-days button:disabled { opacity:.35; cursor:not-allowed; }
 .return-field { grid-area:return; }
 .departure-time-field { grid-area:time; }
 .one-way-button { grid-area:one-way; height:48px; align-self:end; white-space:nowrap; }
@@ -63,6 +73,20 @@ button { cursor: pointer; }
 .search-button:disabled { opacity:.55; cursor:progress; }
 .refresh { font-size:16px; color:var(--muted); display:flex; gap:8px; align-items:center; }
 .message { margin-top:18px; padding:15px 17px; border-radius:13px; border:1px solid var(--line); background:var(--panel); }
+.search-progress { margin-top:18px; padding:17px; border:1px solid var(--line); border-radius:15px; background:var(--panel); box-shadow:var(--shadow); }
+.progress-heading { display:flex; justify-content:space-between; align-items:center; gap:16px; }
+.progress-heading h2 { margin:3px 0 0; font-size:18px; }
+.progress-heading > span { color:var(--muted); font-weight:800; }
+.progress-steps { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; margin-top:14px; }
+.progress-step { display:grid; grid-template-columns:12px minmax(0,1fr); align-items:center; gap:3px 8px; min-width:0; padding:10px; border-radius:10px; background:var(--panel-2); }
+.progress-step > span:not(.progress-dot) { grid-column:2; color:var(--muted); font-size:16px; }
+.progress-step small { grid-column:2; overflow-wrap:anywhere; color:var(--bad); }
+.progress-dot { width:10px; height:10px; border-radius:50%; background:#9aadb3; }
+.progress-step.loading .progress-dot, .progress-step.processing .progress-dot { background:#e6a700; animation:pulse 1.1s ease-in-out infinite; }
+.progress-step.completed .progress-dot { background:var(--good); }
+.progress-step.empty .progress-dot { background:#71858b; }
+.progress-step.failed .progress-dot { background:var(--bad); }
+@keyframes pulse { 50% { opacity:.35; transform:scale(.8); } }
 .message.error { border-color:rgba(255,123,114,.35); color:#ffd0cc; }
 .results { margin-top:22px; display:grid; gap:14px; }
 .summary-card, .result-card { border:1px solid var(--line); background:linear-gradient(180deg, rgba(27,35,48,.98), rgba(21,27,35,.98)); border-radius:17px; padding:18px; box-shadow:0 12px 30px rgba(0,0,0,.17); }
@@ -103,13 +127,22 @@ button { cursor: pointer; }
 }
 @media (max-width:620px) {
   .shell { padding:18px 16px 50px; }
-  .topbar { padding:0 16px; }
+  .topbar { padding:0 16px; position:static; }
+  .mode-switch { display:grid; grid-template-columns:1fr; }
+  .mode { min-height:54px; }
   .route-grid { grid-template-columns:1fr; }
   .route-arrow { height:20px; transform:rotate(90deg); }
   .date-grid { grid-template-columns:1fr; grid-template-areas:"departure" "return" "time" "one-way"; }
   .options-grid, .advanced-grid { grid-template-columns:1fr; }
   .ticket-toggle, .summary-card, .submit-row { align-items:stretch; flex-direction:column; }
   .total { text-align:left; }
+  .card-head { min-width:0; }
+  .card-head > div { min-width:0; }
+  .price-pill { white-space:normal; flex:0 1 auto; text-align:right; }
+  .timeline-row { grid-template-columns:minmax(76px, 94px) minmax(0,1fr); }
+  .timeline-row > :last-child:not(:nth-child(2)) { grid-column:2; }
+  .progress-heading { align-items:flex-start; flex-direction:column; gap:5px; }
+  .progress-steps { grid-template-columns:1fr; }
 }
 
 /* FareWeave components */

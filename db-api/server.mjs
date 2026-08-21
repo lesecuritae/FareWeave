@@ -764,7 +764,7 @@ async function searchWithProfile(profileName, body) {
   if (departure && Number.isNaN(departure.getTime())) throw new HttpError(400, 'invalid departure ISO timestamp');
   if (arrival && Number.isNaN(arrival.getTime())) throw new HttpError(400, 'invalid arrival ISO timestamp');
   if (arrivalBefore && Number.isNaN(arrivalBefore.getTime())) throw new HttpError(400, 'invalid arrival_before ISO timestamp');
-  const maxResults = Math.min(Math.max(Number(body.results || 8), 1), 12);
+  const maxResults = Math.min(Math.max(Number(body.results || 8), 1), 48);
   const options = {
     results: maxResults,
     stopovers: true,

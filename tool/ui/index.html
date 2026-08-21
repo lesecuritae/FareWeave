@@ -44,7 +44,12 @@
         <div class="date-grid">
           <label class="field departure-field">
             <span>Abreise</span>
-            <input id="departureDate" type="date" required>
+            <div class="date-input-row"><input id="departureDate" type="date" required><button id="calendarToggle" class="calendar-toggle" type="button" aria-expanded="false" aria-controls="calendarPanel">Kalender</button></div>
+            <div id="calendarPanel" class="calendar-panel hidden" aria-label="Abreisedatum wählen">
+              <div class="calendar-head"><button id="calendarPrevious" type="button" aria-label="Vorheriger Monat">←</button><strong id="calendarMonth"></strong><button id="calendarNext" type="button" aria-label="Nächster Monat">→</button></div>
+              <div class="calendar-weekdays" aria-hidden="true"><span>Mo</span><span>Di</span><span>Mi</span><span>Do</span><span>Fr</span><span>Sa</span><span>So</span></div>
+              <div id="calendarDays" class="calendar-days"></div>
+            </div>
           </label>
           <label class="field return-field">
             <span>Rückreise <small>(optional)</small></span>
@@ -142,6 +147,10 @@
     </section>
 
     <section id="message" class="message hidden"></section>
+    <section id="searchProgress" class="search-progress hidden" aria-live="polite">
+      <div class="progress-heading"><div><span class="eyebrow">Live-Status</span><h2>Datenquellen werden abgefragt</h2></div><span id="progressSummary">Suche läuft</span></div>
+      <div id="progressSteps" class="progress-steps"></div>
+    </section>
     <section id="results" class="results hidden"></section>
   </main>
 

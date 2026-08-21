@@ -7,6 +7,7 @@ from .config import APP_VERSION
 from . import db as raw_db
 from . import transitous as raw_transitous
 from . import trvl as raw_trvl
+from . import gtfs_flix
 
 CACHE_GENERATION = APP_VERSION
 DB_TTL = 600
@@ -36,7 +37,7 @@ async def transitous_search(request, *, deutschlandticket_only: bool = False):
 
 
 async def flix_search(request):
-    return await cached_call("trvl.flix", _key(request), FLIX_TTL, lambda: raw_trvl.flix_search(request))
+    return await cached_call("gtfs.flix", _key(request), FLIX_TTL, lambda: gtfs_flix.search(request))
 
 
 async def flight_search(request):

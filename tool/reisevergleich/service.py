@@ -66,7 +66,10 @@ async def search(request: TripRequest) -> dict[str, Any]:
     token = begin_scope(refresh=request.refresh_cache)
     try:
         if not request.refresh_cache and not request.include_hotel:
-            cached = await get_cached_journey(request)
+            try:
+                cached = await get_cached_journey(request)
+            except (OSError, TimeoutError):
+                cached = None
             if cached is not None:
                 journey_id, result = cached
                 result = {**result, "journey_id": journey_id, "cache": {**cache_stats(), "journey_hit": True}}
@@ -74,8 +77,11 @@ async def search(request: TripRequest) -> dict[str, Any]:
 
         result = await _compute(request)
         if result.get("status") not in {"missing_fields", "needs_clarification"} and not request.include_hotel:
-            journey_id = await save_journey(request, result)
-            result = {**result, "journey_id": journey_id}
+            try:
+                journey_id = await save_journey(request, result)
+                result = {**result, "journey_id": journey_id}
+            except (OSError, TimeoutError):
+                pass
         result["cache"] = {**cache_stats(), "journey_hit": False}
         return public_result(result)
     finally:

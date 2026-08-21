@@ -1,0 +1,255 @@
+from __future__ import annotations
+
+import asyncio
+import csv
+import io
+import json
+import logging
+import os
+import re
+import sqlite3
+import tempfile
+import time
+import unicodedata
+import zipfile
+from datetime import date, datetime, timedelta, timezone
+from pathlib import Path
+from typing import Any
+
+import httpx
+
+from .config import FLIX_GTFS_DIR, FLIX_GTFS_MAX_AGE, FLIX_GTFS_TIMEOUT, FLIX_GTFS_URL, TRANSITOUS_USER_AGENT, TZ
+from .db import rank_routes
+
+LOG = logging.getLogger(__name__)
+REQUIRED = {"agency.txt", "routes.txt", "trips.txt", "stops.txt", "stop_times.txt", "calendar.txt", "calendar_dates.txt"}
+_lock = asyncio.Lock()
+
+
+def gtfs_seconds(value: str) -> int:
+    parts = value.strip().split(":")
+    if len(parts) != 3:
+        raise ValueError(f"Ungültige GTFS-Zeit: {value!r}")
+    hours, minutes, seconds = (int(part) for part in parts)
+    if hours < 0 or not 0 <= minutes < 60 or not 0 <= seconds < 60:
+        raise ValueError(f"Ungültige GTFS-Zeit: {value!r}")
+    return hours * 3600 + minutes * 60 + seconds
+
+
+def _key(value: str) -> str:
+    text = unicodedata.normalize("NFKD", value.casefold())
+    text = "".join(char for char in text if not unicodedata.combining(char))
+    return " ".join(re.findall(r"[a-z0-9]+", text))
+
+
+def _place_tokens(value: str) -> set[str]:
+    ignored = {"hbf", "hauptbahnhof", "zob", "busbahnhof", "bahnhof", "station", "flixbus", "stop", "bf"}
+    return {token for token in _key(value).split() if token not in ignored}
+
+
+def stop_score(query: str, name: str) -> int:
+    query_key, name_key = _key(query), _key(name)
+    if not query_key or not name_key:
+        return 0
+    if query_key == name_key:
+        return 100
+    query_tokens, name_tokens = _place_tokens(query), _place_tokens(name)
+    if query_tokens and query_tokens == name_tokens:
+        return 90
+    if query_tokens and query_tokens <= name_tokens:
+        return 75
+    if query_key in name_key:
+        return 60
+    return 0
+
+
+def service_active(calendar: dict[str, str] | None, exceptions: dict[str, int], day: date) -> bool:
+    key = day.strftime("%Y%m%d")
+    if key in exceptions:
+        return exceptions[key] == 1
+    if not calendar:
+        return False
+    try:
+        if not calendar["start_date"] <= key <= calendar["end_date"]:
+            return False
+        return calendar[day.strftime("%A").casefold()] == "1"
+    except (KeyError, TypeError):
+        return False
+
+
+def _rows(archive: zipfile.ZipFile, name: str):
+    with archive.open(name) as raw, io.TextIOWrapper(raw, encoding="utf-8-sig", newline="") as text:
+        yield from csv.DictReader(text)
+
+
+def _build_database(zip_path: Path, database_path: Path, metadata: dict[str, Any]) -> None:
+    with zipfile.ZipFile(zip_path) as archive:
+        names = {Path(name).name for name in archive.namelist()}
+        missing = REQUIRED - names
+        if missing:
+            raise ValueError(f"Unvollständiger GTFS-Feed: {', '.join(sorted(missing))}")
+        with sqlite3.connect(database_path) as db:
+            db.executescript("""
+                PRAGMA journal_mode=OFF; PRAGMA synchronous=OFF;
+                CREATE TABLE agency(agency_id TEXT PRIMARY KEY, name TEXT, timezone TEXT);
+                CREATE TABLE route(route_id TEXT PRIMARY KEY, agency_id TEXT, short_name TEXT, long_name TEXT, route_type INTEGER);
+                CREATE TABLE trip(trip_id TEXT PRIMARY KEY, route_id TEXT, service_id TEXT);
+                CREATE TABLE stop(stop_id TEXT PRIMARY KEY, name TEXT, parent_station TEXT, timezone TEXT);
+                CREATE TABLE stop_time(trip_id TEXT, stop_id TEXT, sequence INTEGER, arrival INTEGER, departure INTEGER);
+                CREATE TABLE calendar(service_id TEXT PRIMARY KEY, monday TEXT, tuesday TEXT, wednesday TEXT, thursday TEXT, friday TEXT, saturday TEXT, sunday TEXT, start_date TEXT, end_date TEXT);
+                CREATE TABLE exception(service_id TEXT, date TEXT, exception_type INTEGER, PRIMARY KEY(service_id,date));
+                CREATE TABLE meta(key TEXT PRIMARY KEY, value TEXT);
+            """)
+            db.executemany("INSERT INTO agency VALUES(?,?,?)", ((r.get("agency_id", ""), r.get("agency_name", ""), r.get("agency_timezone") or "UTC") for r in _rows(archive, "agency.txt")))
+            db.executemany("INSERT INTO route VALUES(?,?,?,?,?)", ((r.get("route_id", ""), r.get("agency_id", ""), r.get("route_short_name", ""), r.get("route_long_name", ""), int(r.get("route_type") or -1)) for r in _rows(archive, "routes.txt")))
+            db.executemany("INSERT INTO trip VALUES(?,?,?)", ((r.get("trip_id", ""), r.get("route_id", ""), r.get("service_id", "")) for r in _rows(archive, "trips.txt")))
+            db.executemany("INSERT INTO stop VALUES(?,?,?,?)", ((r.get("stop_id", ""), r.get("stop_name", ""), r.get("parent_station", ""), r.get("stop_timezone", "")) for r in _rows(archive, "stops.txt")))
+            stop_times = []
+            for r in _rows(archive, "stop_times.txt"):
+                try:
+                    stop_times.append((r["trip_id"], r["stop_id"], int(r["stop_sequence"]), gtfs_seconds(r["arrival_time"]), gtfs_seconds(r["departure_time"])))
+                except (KeyError, TypeError, ValueError):
+                    continue
+                if len(stop_times) >= 25000:
+                    db.executemany("INSERT INTO stop_time VALUES(?,?,?,?,?)", stop_times); stop_times.clear()
+            db.executemany("INSERT INTO stop_time VALUES(?,?,?,?,?)", stop_times)
+            weekdays = ("monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday")
+            db.executemany("INSERT OR REPLACE INTO calendar VALUES(?,?,?,?,?,?,?,?,?,?)", ((r.get("service_id", ""), *(r.get(day, "0") for day in weekdays), r.get("start_date", ""), r.get("end_date", "")) for r in _rows(archive, "calendar.txt")))
+            db.executemany("INSERT OR REPLACE INTO exception VALUES(?,?,?)", ((r.get("service_id", ""), r.get("date", ""), int(r.get("exception_type") or 0)) for r in _rows(archive, "calendar_dates.txt")))
+            db.executemany("INSERT INTO meta VALUES(?,?)", ((key, json.dumps(value)) for key, value in metadata.items()))
+            db.executescript("CREATE INDEX stop_time_stop ON stop_time(stop_id,trip_id,sequence); CREATE INDEX stop_time_trip ON stop_time(trip_id,sequence); CREATE INDEX trip_service ON trip(service_id); ANALYZE;")
+            if db.execute("SELECT count(*) FROM stop_time").fetchone()[0] == 0:
+                raise ValueError("GTFS-Feed enthält keine gültigen stop_times")
+
+
+def _refresh_sync(force: bool = False) -> Path:
+    directory = Path(FLIX_GTFS_DIR); directory.mkdir(parents=True, exist_ok=True)
+    database = directory / "flix.sqlite3"
+    if database.exists() and not force and time.time() - database.stat().st_mtime < FLIX_GTFS_MAX_AGE:
+        return database
+    headers = {}
+    meta_path = directory / "feed.json"
+    if meta_path.exists():
+        try:
+            previous = json.loads(meta_path.read_text())
+            if previous.get("etag"): headers["If-None-Match"] = previous["etag"]
+            if previous.get("last_modified"): headers["If-Modified-Since"] = previous["last_modified"]
+        except (OSError, ValueError):
+            pass
+    try:
+        with httpx.Client(timeout=httpx.Timeout(FLIX_GTFS_TIMEOUT, connect=min(10, FLIX_GTFS_TIMEOUT)), follow_redirects=True, headers={"User-Agent": TRANSITOUS_USER_AGENT, "Accept": "application/zip"}) as client:
+            response = client.get(FLIX_GTFS_URL, headers=headers)
+        if response.status_code == 304 and database.exists():
+            os.utime(database, None); return database
+        response.raise_for_status()
+        if len(response.content) < 1024:
+            raise ValueError("GTFS-Download ist unerwartet klein")
+        metadata = {"url": FLIX_GTFS_URL, "etag": response.headers.get("etag"), "last_modified": response.headers.get("last-modified"), "downloaded_at": datetime.now(timezone.utc).isoformat()}
+        with tempfile.TemporaryDirectory(dir=directory) as temporary:
+            zip_path = Path(temporary) / "feed.zip"; zip_path.write_bytes(response.content)
+            new_database = Path(temporary) / "feed.sqlite3"
+            _build_database(zip_path, new_database, metadata)
+            os.replace(new_database, database)
+        temporary_meta = directory / "feed.json.tmp"
+        temporary_meta.write_text(json.dumps(metadata, indent=2)); os.replace(temporary_meta, meta_path)
+    except Exception:
+        if database.exists():
+            LOG.exception("Flix-GTFS-Aktualisierung fehlgeschlagen; letzter gültiger Feed bleibt aktiv")
+            return database
+        raise
+    return database
+
+
+async def ensure_feed(force: bool = False) -> Path:
+    async with _lock:
+        return await asyncio.to_thread(_refresh_sync, force)
+
+
+def _search_sync(database: Path, request) -> dict[str, Any]:
+    requested_day = date.fromisoformat(request.travel_date)
+    requested_local = datetime.combine(requested_day, datetime.strptime(request.departure_after, "%H:%M").time(), tzinfo=TZ)
+    with sqlite3.connect(database) as db:
+        db.row_factory = sqlite3.Row
+        stops = list(db.execute("SELECT stop_id,name,parent_station,timezone FROM stop"))
+        origins = sorted(((stop_score(request.origin, r["name"]), r) for r in stops), reverse=True, key=lambda pair: pair[0])
+        destinations = sorted(((stop_score(request.destination, r["name"]), r) for r in stops), reverse=True, key=lambda pair: pair[0])
+        origin_ids = [r["stop_id"] for score, r in origins if score >= max(60, origins[0][0] - 20)][:24] if origins and origins[0][0] else []
+        destination_ids = [r["stop_id"] for score, r in destinations if score >= max(60, destinations[0][0] - 20)][:24] if destinations and destinations[0][0] else []
+        if not origin_ids or not destination_ids:
+            return {"status": "empty", "routes": [], "candidate_routes": [], "provider_status": {"provider": "flix-gtfs", "ok": True, "error": "Start oder Ziel nicht im Flix-GTFS gefunden"}}
+        placeholders_o, placeholders_d = ",".join("?" * len(origin_ids)), ",".join("?" * len(destination_ids))
+        sql = f"""SELECT t.trip_id,t.service_id,r.route_id,r.agency_id,r.short_name,r.long_name,r.route_type,a.timezone,
+          so.name origin_name,sd.name destination_name,o.departure departure_seconds,d.arrival arrival_seconds,o.sequence origin_sequence,d.sequence destination_sequence
+          FROM stop_time o JOIN stop_time d ON d.trip_id=o.trip_id AND d.sequence>o.sequence
+          JOIN trip t ON t.trip_id=o.trip_id JOIN route r ON r.route_id=t.route_id JOIN agency a ON a.agency_id=r.agency_id
+          JOIN stop so ON so.stop_id=o.stop_id JOIN stop sd ON sd.stop_id=d.stop_id
+          WHERE o.stop_id IN ({placeholders_o}) AND d.stop_id IN ({placeholders_d}) ORDER BY o.departure LIMIT 1000"""
+        candidates = list(db.execute(sql, (*origin_ids, *destination_ids)))
+        services = {r["service_id"] for r in candidates}
+        calendars = {r["service_id"]: dict(r) for r in db.execute(f"SELECT * FROM calendar WHERE service_id IN ({','.join('?' * len(services))})", tuple(services))} if services else {}
+        exceptions: dict[tuple[str, str], int] = {}
+        if services:
+            days = ((requested_day - timedelta(days=1)).strftime('%Y%m%d'), requested_day.strftime('%Y%m%d'))
+            for row in db.execute(f"SELECT * FROM exception WHERE service_id IN ({','.join('?' * len(services))}) AND date IN (?,?)", (*services, *days)):
+                exceptions[(row["service_id"], row["date"])] = row["exception_type"]
+    output = []
+    seen = set()
+    for row in candidates:
+      for service_day in (requested_day - timedelta(days=1), requested_day):
+        day_key = service_day.strftime('%Y%m%d')
+        day_exceptions = {day_key: exceptions[(row["service_id"], day_key)]} if (row["service_id"], day_key) in exceptions else {}
+        if not service_active(calendars.get(row["service_id"]), day_exceptions, service_day): continue
+        agency = row["agency_id"].upper(); route_type = row["route_type"]
+        kind = "train" if "FLIXTRAIN" in agency or route_type in {2, 100, 101, 102, 103, 106} else "bus"
+        if kind == "train" and not request.include_flixtrain or kind == "bus" and not request.include_flixbus: continue
+        agency_tz = timezone.utc if str(row["timezone"]).upper() == "UTC" else TZ
+        base = datetime.combine(service_day, datetime.min.time(), tzinfo=agency_tz)
+        departure = (base + timedelta(seconds=row["departure_seconds"])).astimezone(TZ)
+        arrival = (base + timedelta(seconds=row["arrival_seconds"])).astimezone(TZ)
+        if departure < requested_local or departure >= requested_local + timedelta(hours=36): continue
+        fingerprint = (row["trip_id"], departure.isoformat(), arrival.isoformat())
+        if fingerprint in seen: continue
+        seen.add(fingerprint)
+        provider = "FlixTrain" if kind == "train" else "FlixBus"
+        line = row["short_name"] or provider
+        output.append({"id": f"gtfs-{row['trip_id']}-{row['origin_sequence']}-{day_key}", "provider": provider, "provider_code": "flix", "flix_kind": kind, "type": kind, "line": line, "origin": row["origin_name"], "destination": row["destination_name"], "departure": departure.isoformat(), "arrival": arrival.isoformat(), "duration_minutes": int((arrival-departure).total_seconds()//60), "transfers": 0, "price": None, "price_complete": False, "price_note": "Fahrplandaten aus GTFS; kein Live-Preis verfügbar.", "deutschlandticket_covered": False, "booking_url": "https://global.flixbus.com/", "legs": [{"provider": provider, "mode": kind, "line": line, "origin": row["origin_name"], "destination": row["destination_name"], "departure": departure.isoformat(), "arrival": arrival.isoformat()}], "gtfs_service_id": row["service_id"], "gtfs_route_id": row["route_id"]})
+    ranked = sorted(output, key=lambda route: (route["departure"], route["arrival"], route["provider"]))
+    return {"status": "ok" if ranked else "empty", "routes": ranked[:request.max_results], "candidate_routes": ranked, "candidate_counts": {"train": sum(r["flix_kind"]=="train" for r in ranked), "bus": sum(r["flix_kind"]=="bus" for r in ranked), "mixed": 0}, "provider_status": {"provider": "flix-gtfs", "ok": True, "route_count": len(ranked)}, "error": None}
+
+
+async def search(request, *, force_refresh: bool = False) -> dict[str, Any]:
+    started = time.monotonic()
+    try:
+        database = await ensure_feed(force_refresh)
+        result = await asyncio.to_thread(_search_sync, database, request)
+        result["provider_status"]["duration_ms"] = round((time.monotonic()-started)*1000)
+        return result
+    except Exception as exc:
+        LOG.exception("Flix-GTFS-Suche fehlgeschlagen")
+        return {"status": "failed", "routes": [], "candidate_routes": [], "provider_status": {"provider": "flix-gtfs", "ok": False, "error": f"{type(exc).__name__}: {exc}"}, "error": str(exc)}
+
+
+def _stop_suggestions_sync(database: Path, query: str) -> list[dict[str, Any]]:
+    with sqlite3.connect(database) as db:
+        rows = db.execute("SELECT stop_id,name,timezone FROM stop").fetchall()
+    ranked = sorted(((stop_score(query, row[1]), row) for row in rows), reverse=True, key=lambda item: (item[0], item[1][1]))
+    output, names = [], set()
+    for score, row in ranked:
+        normalized = _key(row[1])
+        if score < 60 or normalized in names: continue
+        names.add(normalized)
+        output.append({"station_id": row[0], "name": row[1], "timezone": row[2]})
+        if len(output) >= 12: break
+    return output
+
+
+async def discover_stops(origin: str, destination: str) -> dict[str, Any]:
+    try:
+        database = await ensure_feed()
+        origin_stops, destination_stops = await asyncio.gather(
+            asyncio.to_thread(_stop_suggestions_sync, database, origin),
+            asyncio.to_thread(_stop_suggestions_sync, database, destination),
+        )
+        return {"origin_stops": origin_stops, "destination_stops": destination_stops, "source": "flix-gtfs"}
+    except Exception as exc:
+        return {"origin_stops": [], "destination_stops": [], "source": "flix-gtfs", "error": f"{type(exc).__name__}: {exc}"}

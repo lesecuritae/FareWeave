@@ -13,6 +13,7 @@ from .provider_cache import db_search_with_retry, db_split_analysis, flix_search
 from .ground_mixed import ground_mixed_options
 from .history import enrich_routes_history
 from .utils import as_float, as_int, parse_datetime, route_departure_in_window
+from .progress import update as progress
 
 _route_departure_in_window = route_departure_in_window
 
@@ -26,6 +27,9 @@ def select_visible_ground_options(
     ranked_flix = rank_routes(flix_routes, request.preference)
     if request.max_results == 1:
         return rank_routes(ranked_db + ranked_flix, request.preference)[:1]
+
+    def chronological(routes: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        return sorted(routes, key=lambda route: str((route.get("departure") or {}).get("time") if isinstance(route.get("departure"), dict) else route.get("departure") or ""))
 
     train = [route for route in ranked_flix if route.get("flix_kind") == "train"]
     bus = [route for route in ranked_flix if route.get("flix_kind") == "bus"]
@@ -41,7 +45,7 @@ def select_visible_ground_options(
 
     known = {connection_signature(route) for route in selected}
     if len(selected) >= request.max_results:
-        return selected
+        return chronological(selected)
     for pool in (ranked_db, ranked_flix):
         for route in pool:
             signature = connection_signature(route)
@@ -50,8 +54,8 @@ def select_visible_ground_options(
             selected.append(route)
             known.add(signature)
             if len(selected) >= request.max_results:
-                return selected
-    return selected
+                return chronological(selected)
+    return chronological(selected)
 
 
 def _compact_split(split: dict[str, Any]) -> dict[str, Any]:
@@ -71,6 +75,8 @@ def _compact_split(split: dict[str, Any]) -> dict[str, Any]:
 
 
 async def compare_trip(request: ReiseRequest) -> dict[str, Any]:
+    for step in ("db", "transitous", "gtfs", "flixbus", "flixtrain"):
+        progress(step, "loading")
     db_task = asyncio.create_task(db_search_with_retry(
         origin=request.origin,
         destination=request.destination,
@@ -85,22 +91,57 @@ async def compare_trip(request: ReiseRequest) -> dict[str, Any]:
     transitous_task = asyncio.create_task(transitous_search(request))
     flix_task = asyncio.create_task(flix_search(request))
 
+    def provider_finished(step: str, task, routes_key: str, *, tuple_result: bool = False) -> None:
+        try:
+            value = task.result()
+            if tuple_result: value = value[0]
+            progress(step, "completed" if (value.get(routes_key) or []) else "empty")
+        except BaseException as exc:
+            progress(step, "failed", f"{type(exc).__name__}: {exc}")
+
+    db_task.add_done_callback(lambda task: provider_finished("db", task, "journeys", tuple_result=True))
+    transitous_task.add_done_callback(lambda task: provider_finished("transitous", task, "routes"))
+
+    def flix_finished(task) -> None:
+        try:
+            value = task.result(); counts = value.get("candidate_counts") or {}
+            ok = (value.get("provider_status") or {}).get("ok") is True
+            progress("gtfs", "completed" if ok else "failed", (value.get("provider_status") or {}).get("error"))
+            progress("flixbus", "completed" if counts.get("bus") else ("empty" if ok else "failed"))
+            progress("flixtrain", "completed" if counts.get("train") else ("empty" if ok else "failed"))
+        except BaseException as exc:
+            progress("gtfs", "failed", f"{type(exc).__name__}: {exc}")
+            progress("flixbus", "failed"); progress("flixtrain", "failed")
+    flix_task.add_done_callback(flix_finished)
+
     try:
         db_result, db_attempts = await db_task
+        progress("db", "completed" if db_result.get("journeys") else "empty")
     except Exception as exc:
+        progress("db", "failed", f"{type(exc).__name__}: {exc}")
         db_result = {"status": "failed", "journeys": []}
         db_attempts = [{"source": "db-api", "attempt": 1, "ok": False, "error": f"{type(exc).__name__}: {exc}"}]
 
     try:
         transitous_result = await transitous_task
+        progress("transitous", "completed" if transitous_result.get("routes") else "empty")
     except Exception as exc:
+        progress("transitous", "failed", f"{type(exc).__name__}: {exc}")
         transitous_result = {"routes": [], "diagnostic": {"ok": False, "error": f"{type(exc).__name__}: {exc}"}}
 
     try:
         flix_result = await flix_task
+        counts = flix_result.get("candidate_counts") or {}
+        provider_ok = (flix_result.get("provider_status") or {}).get("ok") is True
+        progress("gtfs", "completed" if provider_ok else "failed", (flix_result.get("provider_status") or {}).get("error"))
+        progress("flixbus", "completed" if counts.get("bus") else ("empty" if provider_ok else "failed"))
+        progress("flixtrain", "completed" if counts.get("train") else ("empty" if provider_ok else "failed"))
     except Exception as exc:
+        progress("gtfs", "failed", f"{type(exc).__name__}: {exc}")
+        progress("flixbus", "failed"); progress("flixtrain", "failed")
         flix_result = {"routes": [], "provider_status": {"provider": "flixbus", "ok": False, "error": f"{type(exc).__name__}: {exc}"}}
 
+    progress("merge", "processing")
     db_routes = db_result.get("journeys") or []
     db_source = db_result.get("source")
     transitous_diagnostic = transitous_result.get("diagnostic")
@@ -183,7 +224,7 @@ async def compare_trip(request: ReiseRequest) -> dict[str, Any]:
     elif split.get("status") in {"failed", "unavailable", "skipped"}:
         warnings.append("Die interne Zwei-Ticket-Prüfung konnte für diese Verbindung nicht vollständig ausgewertet werden.")
 
-    return {
+    result = {
         "status": "ok" if combined else "manual_required",
         "search_mode": "price_compare",
         "current_date": today_iso(),
@@ -209,6 +250,8 @@ async def compare_trip(request: ReiseRequest) -> dict[str, Any]:
         "split_ticket": _compact_split(split),
         "warnings": warnings,
     }
+    progress("merge", "completed" if combined else "empty")
+    return result
 
 
 async def deutschlandticket(request: DeutschlandticketRequest) -> dict[str, Any]:
