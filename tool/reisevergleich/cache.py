@@ -273,3 +273,23 @@ def history_detail_delete(cache_key: str) -> None:
     with _connect() as db:
         db.execute("DELETE FROM history_detail_cache WHERE cache_key=?", (cache_key,))
         db.commit()
+
+
+def history_stats_snapshot_entries() -> list[dict[str, Any]]:
+    """Return completed, unexpired reliability results for the background archiver."""
+    now = time.time()
+    with _connect() as db:
+        rows = db.execute(
+            "SELECT cache_key,payload,created_at FROM component_cache "
+            "WHERE namespace=? AND expires_at>? AND schema_version=? ORDER BY cache_key",
+            ("history.stats", now, CACHE_SCHEMA),
+        ).fetchall()
+    output: list[dict[str, Any]] = []
+    for cache_key, payload, updated_at in rows:
+        try:
+            value = json.loads(payload)
+        except (TypeError, ValueError, json.JSONDecodeError):
+            continue
+        if isinstance(value, dict) and value.get("status") in {"ok", "insufficient_data"}:
+            output.append({"cache_key": cache_key, "payload": value, "updated_at": updated_at})
+    return output

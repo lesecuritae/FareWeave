@@ -242,6 +242,19 @@ metadata and completed statistics remain in the existing `cache.sqlite3`. FareWe
 creates neither a second database nor a full dataset mirror. Setting
 `HISTORY_ENABLED=false` disables the layer completely.
 
+Separately, FareWeave can store daily, JSON-safe observation snapshots in the
+`snapshots` subdirectory. At most one atomically replaced file exists per identifier
+and calendar day, and exactly 30 calendar days are retained by default. Corrupt files
+are removed while reading; fields for tokens, passwords, cookies, authorization data,
+or API keys are rejected before writing. The live search never writes snapshots and is
+therefore neither delayed nor allowed to change connections, prices, or ranking. An
+internal background task archives only already-computed history statistics instead. It
+starts after 60 seconds by default and then runs once per day. Failures are logged in
+isolation and the next cycle continues. Set `HISTORY_SNAPSHOT_SCHEDULER_ENABLED=false`
+to disable it. Interval, initial delay, and retention are controlled by
+`HISTORY_SNAPSHOT_INTERVAL_SECONDS`, `HISTORY_SNAPSHOT_INITIAL_DELAY_SECONDS`, and
+`HISTORY_SNAPSHOT_RETENTION_DAYS`.
+
 ## Installation with Docker
 
 Docker, the Docker Compose plugin, Git, and OpenSSL are required. The official installation path uses the published GHCR images and builds nothing locally:

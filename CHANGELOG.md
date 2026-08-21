@@ -9,6 +9,9 @@
 - Das starre 10er-Limit wurde durch standardmäßig 24 und maximal 48 Verbindungen ersetzt; die sichtbare Liste ist chronologisch.
 - Kalender, mobile Karten und nicht-sticky Mobile-Navigation wurden überarbeitet.
 - Ein requestisolierter Live-Loader zeigt echte Zustände von DB, Transitous, GTFS, FlixBus, FlixTrain und Ergebnisaufbereitung.
+- Eine getrennte atomare History-Snapshot-Schicht kann tägliche, JSON-sichere Beobachtungen 30 Tage halten; beschädigte Daten werden verworfen und secret-verdächtige Felder abgelehnt.
+- Ein fehlertoleranter Lifespan-Scheduler archiviert bereits berechnete History-Statistiken standardmäßig einmal täglich außerhalb von Nutzeranfragen und kann vollständig deaktiviert werden.
+- Die Testumgebung ist als installierbares Python-Projekt mit separaten pytest-Abhängigkeiten reproduzierbar.
 
 ## 0.0.3 - 2026-08-14
 

@@ -242,6 +242,21 @@ Metadaten und fertige Statistiken liegen in der bestehenden `cache.sqlite3`. Es 
 keine zweite Datenbank und keine vollständige Datensatzkopie angelegt. Mit
 `HISTORY_ENABLED=false` ist die Schicht vollständig deaktiviert.
 
+Davon getrennt kann FareWeave tägliche, JSON-sichere Beobachtungssnapshots unter dem
+Unterverzeichnis `snapshots` ablegen. Pro Kennung und Kalendertag existiert höchstens
+eine atomar ersetzte Datei; standardmäßig bleiben genau 30 Kalendertage erhalten.
+Beschädigte Dateien werden beim Lesen entfernt, und Felder für Tokens, Passwörter,
+Cookies, Autorisierungsdaten oder API-Schlüssel werden vor dem Schreiben abgelehnt.
+Die Live-Suche schreibt keine Snapshots und wird dadurch weder verzögert noch in
+Verbindungen, Preisen oder Ranking beeinflusst. Stattdessen archiviert ein interner
+Hintergrundtask ausschließlich bereits fertig berechnete History-Statistiken. Er startet
+nach standardmäßig 60 Sekunden und läuft danach einmal täglich. Fehler werden isoliert
+protokolliert; der nächste Zyklus läuft weiter. Der Task kann mit
+`HISTORY_SNAPSHOT_SCHEDULER_ENABLED=false` deaktiviert werden. Intervall, Startverzögerung
+und Aufbewahrung sind über `HISTORY_SNAPSHOT_INTERVAL_SECONDS`,
+`HISTORY_SNAPSHOT_INITIAL_DELAY_SECONDS` und `HISTORY_SNAPSHOT_RETENTION_DAYS`
+konfigurierbar.
+
 ## Installation mit Docker
 
 Voraussetzungen sind Docker, das Docker-Compose-Plugin, Git und OpenSSL. Der offizielle Installationsweg verwendet die fertig veröffentlichten GHCR-Images und baut nichts lokal:

@@ -23,3 +23,5 @@ for header in (
     assert header in source
 assert "frame-ancestors 'none'" in source
 assert "object-src 'none'" in source
+assert "lifespan=lifespan" in source
+assert "start_scheduler()" in source and "await stop_scheduler(scheduler)" in source

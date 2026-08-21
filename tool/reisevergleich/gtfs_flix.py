@@ -15,6 +15,7 @@ import zipfile
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import httpx
 
@@ -35,6 +36,18 @@ def gtfs_seconds(value: str) -> int:
     if hours < 0 or not 0 <= minutes < 60 or not 0 <= seconds < 60:
         raise ValueError(f"Ungültige GTFS-Zeit: {value!r}")
     return hours * 3600 + minutes * 60 + seconds
+
+
+def gtfs_local_datetime(service_day: date, seconds: int, agency_timezone: str | None) -> datetime:
+    """Convert GTFS wall-clock seconds in the agency timezone to FareWeave local time."""
+    timezone_name = str(agency_timezone or "").strip() or str(TZ)
+    try:
+        source_timezone = ZoneInfo(timezone_name)
+    except ZoneInfoNotFoundError:
+        LOG.warning("Unbekannte GTFS-Zeitzone %r; verwende %s", timezone_name, TZ)
+        source_timezone = TZ
+    base = datetime.combine(service_day, datetime.min.time(), tzinfo=source_timezone)
+    return (base + timedelta(seconds=seconds)).astimezone(TZ)
 
 
 def _key(value: str) -> str:
@@ -203,10 +216,8 @@ def _search_sync(database: Path, request) -> dict[str, Any]:
         agency = row["agency_id"].upper(); route_type = row["route_type"]
         kind = "train" if "FLIXTRAIN" in agency or route_type in {2, 100, 101, 102, 103, 106} else "bus"
         if kind == "train" and not request.include_flixtrain or kind == "bus" and not request.include_flixbus: continue
-        agency_tz = timezone.utc if str(row["timezone"]).upper() == "UTC" else TZ
-        base = datetime.combine(service_day, datetime.min.time(), tzinfo=agency_tz)
-        departure = (base + timedelta(seconds=row["departure_seconds"])).astimezone(TZ)
-        arrival = (base + timedelta(seconds=row["arrival_seconds"])).astimezone(TZ)
+        departure = gtfs_local_datetime(service_day, row["departure_seconds"], row["timezone"])
+        arrival = gtfs_local_datetime(service_day, row["arrival_seconds"], row["timezone"])
         if departure < requested_local or departure >= requested_local + timedelta(hours=36): continue
         fingerprint = (row["trip_id"], departure.isoformat(), arrival.isoformat())
         if fingerprint in seen: continue
