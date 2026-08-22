@@ -50,10 +50,56 @@ def gtfs_local_datetime(service_day: date, seconds: int, agency_timezone: str | 
     return (base + timedelta(seconds=seconds)).astimezone(TZ)
 
 
+# Der Flix-GTFS-Feed (transitous eu_flixbus) führt viele Städte ausschließlich unter
+# ihrem englischen Namen: "Munich central bus station", "Cologne", "Vienna". Eine Suche
+# nach "München" trifft damit keinen einzigen Stop, und die komplette Flix-Seite des
+# Vergleichs fällt still weg — die Antwort enthält dann nur noch Bahnverbindungen, ohne
+# dass ein Fehler sichtbar wird.
+#
+# Beide Schreibweisen sind nötig: _key entfernt Diakritika ("München" -> "munchen"),
+# Nutzereingaben verwenden aber oft die ASCII-Umschrift ("Muenchen").
+# Aufgenommen sind nur Städte, deren deutscher Name im Feed nicht vorkommt und deren
+# englischer Name dort existiert. "Rom" und "Turin" fehlen deshalb bewusst: "rom" ist im
+# Feed als eigenes Token vorhanden, "Turin" ist in beiden Sprachen identisch. "Zürich"
+# braucht nur die ASCII-Form, weil die Diakritika-Entfernung bereits "zurich" ergibt.
+CITY_ALIASES = {
+    "munchen": "munich", "muenchen": "munich",
+    "koln": "cologne", "koeln": "cologne",
+    "nurnberg": "nuremberg", "nuernberg": "nuremberg",
+    "hannover": "hanover",
+    "braunschweig": "brunswick",
+    "wien": "vienna",
+    "zuerich": "zurich",
+    "genf": "geneva",
+    "prag": "prague",
+    "warschau": "warsaw",
+    "krakau": "krakow",
+    "danzig": "gdansk",
+    "breslau": "wroclaw",
+    "posen": "poznan",
+    "mailand": "milan",
+    "florenz": "florence",
+    "venedig": "venice",
+    "neapel": "naples",
+    "genua": "genoa",
+    "brussel": "brussels", "bruessel": "brussels",
+    "antwerpen": "antwerp",
+    "kopenhagen": "copenhagen",
+    "lissabon": "lisbon",
+    "sevilla": "seville",
+    "athen": "athens",
+    "bukarest": "bucharest",
+    "saloniki": "thessaloniki",
+    "laibach": "ljubljana",
+    "agram": "zagreb",
+    "pressburg": "bratislava",
+}
+
+
 def _key(value: str) -> str:
     text = unicodedata.normalize("NFKD", value.casefold())
     text = "".join(char for char in text if not unicodedata.combining(char))
-    return " ".join(re.findall(r"[a-z0-9]+", text))
+    return " ".join(CITY_ALIASES.get(token, token) for token in re.findall(r"[a-z0-9]+", text))
 
 
 def _place_tokens(value: str) -> set[str]:
