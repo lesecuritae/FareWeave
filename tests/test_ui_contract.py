@@ -55,6 +55,10 @@ for needle in [
     "Mobilfunk entlang der Strecke",
     "/api/coverage",
     "Minuten vor gewünschter Zeit",
+    "/api/stations",
+    "Bitte Start und Ziel aus der Stationsliste auswählen.",
+    "origin_station: state.travelMode === 'ground' ? state.stations.origin : null",
+    "destination_station: state.travelMode === 'ground' ? state.stations.destination : null",
 ]:
     assert needle in js
 assert "state.hotelType === 'hotel' || state.hotelType === 'resort'" in js

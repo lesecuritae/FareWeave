@@ -261,6 +261,11 @@ body {
 
 
 .action-links { display: flex; flex-wrap: wrap; gap: 8px; margin: 13px 0 0; }
+.route-grid .field { position:relative; }
+.station-suggestions { position:absolute; z-index:30; top:100%; left:0; right:0; max-height:320px; overflow:auto; margin-top:5px; padding:6px; border:1px solid var(--line); border-radius:12px; background:#fff; box-shadow:0 14px 34px rgba(16,59,74,.18); }
+.station-suggestions button { display:flex; width:100%; flex-direction:column; gap:3px; padding:10px 11px; border:0; border-radius:8px; background:transparent; color:var(--text); text-align:left; cursor:pointer; }
+.station-suggestions button:hover, .station-suggestions button:focus { background:#eaf5f6; }
+.station-suggestions span { color:var(--muted); font-size:16px; overflow-wrap:anywhere; }
 .action-link { display: inline-flex; align-items: center; min-height: 38px; padding: 8px 12px; border: 1px solid #a9cbd2; border-radius: 9px; background: #edf8fa; font-weight: 800; text-decoration: none; }
 .action-link:hover { background: #dff2f5; }
 

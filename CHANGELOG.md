@@ -1,4 +1,13 @@
 # Changelog
+## 0.1.1 - 2026-08-24
+
+- Föderierter Stationskatalog aus vorhandenen DB-, Transitous- und Flix-GTFS-Quellen; keine redundante Stationsdatenbank.
+- Start und Ziel werden über bestätigte, provider-native Stations-IDs statt ungesichertem Freitext an die verfügbaren Routingquellen übergeben.
+- Exakte Stationsnamen und eindeutige internationale Aliase werden automatisch bestätigt; nur geografisch mehrdeutige Treffer wie Wien/Vienna und Vienna, Virginia erfordern eine sichtbare Nutzerauswahl.
+- Stationsgruppen werden anhand realer Koordinaten zusammengeführt und bewahren getrennte DB-, Transitous- und Flix-IDs für dieselbe aktuelle Suche.
+- Flughafen- und Bahnhofskontext bleiben strikt getrennt; Provider ohne passende ID werden bei einer bestätigten mehrdeutigen Auswahl übersprungen statt auf einen ähnlich klingenden Ort zu raten.
+- Der bestehende SQLite/WAL-Komponentencache speichert Stationsauflösungen fünf Minuten und verhindert doppelte Providerabfragen.
+
 ## 0.1.0 - 2026-08-24
 
 - Der Coverage Analyzer bewertet nach jeder Bodenreise mobiles Breitband (4G oder 5G) entlang des Streckenverlaufs für Fern-/Regionalbahn, FlixTrain, FlixBus und internationale Partnerverbindungen.

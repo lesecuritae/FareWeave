@@ -32,12 +32,14 @@
         <div class="route-grid">
           <label class="field grow">
             <span>Von</span>
-            <input id="origin" name="origin" placeholder="Startbahnhof oder Ort" autocomplete="off" required>
+            <input id="origin" name="origin" placeholder="Bahnhof oder Haltestelle suchen" autocomplete="off" role="combobox" aria-autocomplete="list" aria-controls="originSuggestions" required>
+            <div id="originSuggestions" class="station-suggestions hidden" role="listbox"></div>
           </label>
           <div class="route-arrow" aria-hidden="true">→</div>
           <label class="field grow">
             <span>Nach</span>
-            <input id="destination" name="destination" placeholder="Zielort" autocomplete="off" required>
+            <input id="destination" name="destination" placeholder="Bahnhof oder Haltestelle suchen" autocomplete="off" role="combobox" aria-autocomplete="list" aria-controls="destinationSuggestions" required>
+            <div id="destinationSuggestions" class="station-suggestions hidden" role="listbox"></div>
           </label>
         </div>
 

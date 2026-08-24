@@ -39,6 +39,8 @@ async def _compute(request: TripRequest) -> dict[str, Any]:
                 split_ticket_check=request.split_ticket_check,
                 flix_origin_stop_id=request.flix_origin_stop_id,
                 flix_destination_stop_id=request.flix_destination_stop_id,
+                origin_station=request.origin_station,
+                destination_station=request.destination_station,
                 deutschlandticket_mode="only" if request.deutschlandticket_only else ("include" if request.deutschlandticket else "exclude"),
                 split_candidates=request.feeder_split_candidates,
                 one_way=request.journey_type == "one_way",

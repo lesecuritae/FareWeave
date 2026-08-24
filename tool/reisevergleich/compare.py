@@ -89,7 +89,12 @@ async def compare_trip(request: ReiseRequest) -> dict[str, Any]:
         progress(step, "loading")
     provider_date, provider_time = departure_search_floor(request.travel_date, request.departure_after)
     provider_request = request.model_copy(update={"travel_date": provider_date, "departure_after": provider_time})
-    db_task = asyncio.create_task(db_search_with_retry(
+    db_origin_id = request.origin_station.id_for("db") if request.origin_station else None
+    db_destination_id = request.destination_station.id_for("db") if request.destination_station else None
+    selections_active = bool(request.origin_station and request.destination_station)
+    async def unsupported_db():
+        return ({"status": "empty", "journeys": []}, [{"source":"db-api", "ok":False, "skipped":True, "error":"Ausgewählte Station besitzt keine DB-ID."}])
+    db_task = asyncio.create_task((db_search_with_retry(
         origin=request.origin,
         destination=request.destination,
         travel_date=provider_date,
@@ -97,11 +102,23 @@ async def compare_trip(request: ReiseRequest) -> dict[str, Any]:
         mode="all",
         max_transfers=request.max_transfers,
         results=request.max_results,
-    ))
+        origin_id=db_origin_id,
+        destination_id=db_destination_id,
+    ) if not selections_active or (db_origin_id and db_destination_id) else unsupported_db()))
     # Fallbacks parallel starten: Wenn DBnav/DB langsam ist, ist Transitous bereits
     # unterwegs. Flix läuft ebenfalls unabhängig und kann die Bahn nie blockieren.
-    transitous_task = asyncio.create_task(transitous_search(provider_request))
-    flix_task = asyncio.create_task(flix_search(provider_request))
+    transitous_supported = not selections_active or (
+        request.origin_station.id_for("transitous") and request.destination_station.id_for("transitous")
+    )
+    flix_supported = not selections_active or (
+        request.origin_station.id_for("flix") and request.destination_station.id_for("flix")
+    )
+    async def unsupported_transitous():
+        return {"routes": [], "diagnostic": {"ok":False, "skipped":True, "error":"Ausgewählte Station besitzt keine Transitous-ID."}}
+    async def unsupported_flix():
+        return {"routes": [], "candidate_routes": [], "provider_status": {"ok":False, "skipped":True, "error":"Ausgewählte Station besitzt keine Flix-ID."}}
+    transitous_task = asyncio.create_task(transitous_search(provider_request) if transitous_supported else unsupported_transitous())
+    flix_task = asyncio.create_task(flix_search(provider_request) if flix_supported else unsupported_flix())
 
     def provider_finished(step: str, task, routes_key: str, *, tuple_result: bool = False) -> None:
         try:
@@ -393,6 +410,8 @@ async def compare_ground_round_trip(
     one_way: bool = False,
     flix_origin_stop_id: str | None = None,
     flix_destination_stop_id: str | None = None,
+    origin_station=None,
+    destination_station=None,
 ) -> dict[str, Any]:
     if deutschlandticket_mode == "only":
         outward_dt = await deutschlandticket(DeutschlandticketRequest(
@@ -484,6 +503,8 @@ async def compare_ground_round_trip(
         deutschlandticket=deutschlandticket_mode == "include",
         flix_origin_stop_id=flix_origin_stop_id,
         flix_destination_stop_id=flix_destination_stop_id,
+        origin_station=origin_station,
+        destination_station=destination_station,
     )
     outbound = await compare_trip(outbound_request)
 
@@ -558,6 +579,8 @@ async def compare_ground_round_trip(
         deutschlandticket=deutschlandticket_mode == "include",
         flix_origin_stop_id=flix_destination_stop_id,
         flix_destination_stop_id=flix_origin_stop_id,
+        origin_station=destination_station,
+        destination_station=origin_station,
     )
     return_result = await compare_trip(return_request)
     outbound_mixed: list[dict[str, Any]] = []

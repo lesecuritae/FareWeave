@@ -8,7 +8,7 @@
 
 Rail, the Deutschlandticket, split tickets, FlixTrain, FlixBus, flights, airport feeders, transfers, and accommodation are combined into a single itinerary. FareWeave does not merely look for a low price somewhere. Every part of the journey must fit together both chronologically and logically.
 
-Current version: **0.1.0**
+Current version: **0.1.1**
 
 FareWeave does not sell or book anything itself. If a provider supplies a usable offer link, it can be opened directly from the result. Where no direct link is available, FareWeave offers a suitable manual cross-check, for example with Deutsche Bahn, Google Flights, Google Hotels, or Google Maps. Price and availability must always be verified with the actual provider.
 
@@ -98,11 +98,11 @@ trvl supplies data in selected places. FareWeave then applies deterministic rule
 
 Flight providers are queried separately and have their own time limits. A slow or broken provider must not block the entire journey plan.
 
-FareWeave 0.1.0 first queries **Skiplagged, Ryanair, Vueling, and easyJet**. If those results are insufficient, it continues with **Transavia, Norwegian, Air France/KLM, and Wizz Air**.
+FareWeave 0.1.1 first queries **Skiplagged, Ryanair, Vueling, and easyJet**. If those results are insufficient, it continues with **Transavia, Norwegian, Air France/KLM, and Wizz Air**.
 
 The aggregated trvl request is not passed through without limits. FareWeave queries the required providers in isolation, combines usable results, and rejects chronologically implausible flights.
 
-Google Flights is also included as a manual cross-check. In FareWeave 0.1.0 it is **not a separate automated Google Flights provider**, but a suitable search link for the requested route and travel dates.
+Google Flights is also included as a manual cross-check. In FareWeave 0.1.1 it is **not a separate automated Google Flights provider**, but a suitable search link for the requested route and travel dates.
 
 ## Transfers and public transport
 
@@ -353,7 +353,13 @@ docker compose build
 docker compose up -d
 ```
 
-trvl is pinned through `TRVL_REF`; FareWeave 0.1.0 uses `v1.21.4` by default.
+trvl is pinned through `TRVL_REF`; FareWeave 0.1.1 uses `v1.21.4` by default.
+
+## Unambiguous station selection
+
+For rail and bus journeys FareWeave searches the existing DB station data, the international Transitous directory and the already loaded Flix GTFS in parallel. Results for the same stop are grouped by real coordinates, while the current search request retains each provider's native ID. DB, Transitous and Flix therefore no longer have to guess a selected stop from a similar free-text name; TRVL receives the same confirmed name for compatible provider paths.
+
+Exact station names and unambiguous aliases are confirmed automatically. A region/country choice is shown only for genuine geographic ambiguity, such as Vienna in Austria versus Vienna in Virginia. A ground search cannot start before that ambiguity is resolved. Resolutions use the existing SQLite/WAL component cache for five minutes; no duplicate station database is maintained.
 
 ## Mobile coverage along a journey
 

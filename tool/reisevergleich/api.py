@@ -14,6 +14,7 @@ from .coverage import analyze_route
 from .service import search
 from .progress import begin as begin_progress, end as end_progress, get as get_progress, valid_search_id
 from .gtfs_flix import discover_stops as discover_gtfs_flix_stops
+from .station_catalog import search_stations
 from .trvl import capability_report
 
 router = APIRouter()
@@ -56,6 +57,11 @@ async def coverage(request: CoverageRequest) -> dict[str, Any]:
 @router.get("/api/flix-stops")
 async def flix_stops(origin: str = Query(min_length=1), destination: str = Query(min_length=1)) -> dict[str, Any]:
     return await discover_gtfs_flix_stops(origin, destination)
+
+
+@router.get("/api/stations")
+async def stations(q: str = Query(min_length=2, max_length=120), limit: int = Query(default=12, ge=1, le=20)) -> dict[str, Any]:
+    return await search_stations(q, limit)
 
 
 @router.get("/api/config")

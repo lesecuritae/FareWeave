@@ -7,7 +7,7 @@ import {profile as dbProfile} from './vendor/p/db/index.js';
 import {profile as dbnavProfile} from './vendor/p/dbnav/index.js';
 
 const PORT = Number.parseInt(process.env.PORT || '3001', 10);
-const USER_AGENT = process.env.USER_AGENT || 'fareweave/0.1.0';
+const USER_AGENT = process.env.USER_AGENT || 'fareweave/0.1.1';
 const REQUEST_TIMEOUT_MS = Number.parseInt(process.env.DB_REQUEST_TIMEOUT_MS || '20000', 10);
 const SPLIT_TIMEOUT_MS = Number.parseInt(process.env.DB_SPLIT_TIMEOUT_MS || '75000', 10);
 const SPLIT_REQUEST_TIMEOUT_MS = Number.parseInt(process.env.DB_SPLIT_REQUEST_TIMEOUT_MS || '15000', 10);
@@ -374,9 +374,10 @@ function terminalCompatibility(query, candidate) {
   return -1000;
 }
 
-async function resolveLocation(client, query, profileName) {
+async function resolveLocation(client, query, profileName, directId = null) {
   if (!query || typeof query !== 'string') throw new HttpError(400, 'origin/destination missing');
   const cleaned = query.trim();
+  if (directId && typeof directId === 'string') return {id: directId.trim(), name: cleaned};
   if (/^\d{6,}$/.test(cleaned)) return {id: cleaned, name: cleaned};
 
   const lookupQueries = [cleaned];
@@ -755,8 +756,8 @@ async function searchWithProfile(profileName, body) {
   const client = clients[profileName];
   if (!client) throw new Error(`unknown DB profile: ${profileName}`);
   const [origin, destination] = await Promise.all([
-    resolveLocation(client, body.origin, profileName),
-    resolveLocation(client, body.destination, profileName),
+    resolveLocation(client, body.origin, profileName, body.origin_id),
+    resolveLocation(client, body.destination, profileName, body.destination_id),
   ]);
   const mode = body.mode === 'deutschlandticket' ? 'deutschlandticket' : 'all';
   const departure = body.departure ? new Date(body.departure) : null;
@@ -1483,6 +1484,32 @@ const server = http.createServer(async (req, res) => {
         () => searchJourneys(body),
       );
       return send(res, 200, result);
+    }
+    if (req.method === 'GET' && req.url.startsWith('/locations?')) {
+      const query = new URL(req.url, 'http://localhost').searchParams.get('q')?.trim();
+      if (!query || query.length < 2) throw new HttpError(400, 'q must contain at least two characters');
+      const lists = await Promise.allSettled(PROFILE_ORDER.map(async (profileName) => {
+        const client = clients[profileName];
+        const items = await withTimeout(client.locations(query, {
+          results: 20, stops: true, addresses: false, poi: false, language: 'de',
+        }), REQUEST_TIMEOUT_MS, `${profileName} location suggestions`);
+        return (Array.isArray(items) ? items : []).filter((item) =>
+          (item?.type === 'station' || item?.type === 'stop') && item.id
+        ).map((item) => ({
+          provider: 'db', provider_id: String(item.id), name: item.name || String(item.id),
+          latitude: item.location?.latitude ?? null, longitude: item.location?.longitude ?? null,
+        }));
+      }));
+      const seen = new Set();
+      const locations = [];
+      for (const settled of lists) {
+        if (settled.status !== 'fulfilled') continue;
+        for (const item of settled.value) {
+          if (seen.has(item.provider_id)) continue;
+          seen.add(item.provider_id); locations.push(item);
+        }
+      }
+      return send(res, 200, {locations: locations.slice(0, 20)});
     }
     if (req.method === 'POST' && req.url === '/split') {
       const body = await readJson(req);

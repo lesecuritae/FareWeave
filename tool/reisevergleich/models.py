@@ -9,6 +9,29 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 from .config import TZ, today_iso
 
 
+class StationSelection(BaseModel):
+    """A user-confirmed stop with its provider-native identifier."""
+
+    name: str = Field(min_length=1, max_length=180)
+    provider: Literal["db", "transitous", "flix"]
+    provider_id: str = Field(min_length=1, max_length=240)
+    provider_ids: dict[str, str] = Field(default_factory=dict)
+    latitude: float | None = Field(default=None, ge=-90, le=90)
+    longitude: float | None = Field(default=None, ge=-180, le=180)
+
+    @model_validator(mode="after")
+    def include_primary_provider(self):
+        self.provider_ids = {
+            key: value for key, value in self.provider_ids.items()
+            if key in {"db", "transitous", "flix"} and isinstance(value, str) and value.strip()
+        }
+        self.provider_ids[self.provider] = self.provider_id
+        return self
+
+    def id_for(self, provider: str) -> str | None:
+        return self.provider_ids.get(provider)
+
+
 def _future_or_today(value: str | None, field_name: str) -> str | None:
     if value is None:
         return None
@@ -36,6 +59,8 @@ class ReiseRequest(BaseModel):
     deutschlandticket: bool = False
     flix_origin_stop_id: str | None = None
     flix_destination_stop_id: str | None = None
+    origin_station: StationSelection | None = None
+    destination_station: StationSelection | None = None
 
     @field_validator("origin", "destination")
     @classmethod
@@ -73,6 +98,10 @@ class ReiseRequest(BaseModel):
     def different_stations(self):
         if self.origin.casefold() == self.destination.casefold():
             raise ValueError("Start und Ziel müssen verschieden sein")
+        if self.origin_station and self.origin.casefold() != self.origin_station.name.casefold():
+            raise ValueError("origin muss der ausgewählten origin_station entsprechen")
+        if self.destination_station and self.destination.casefold() != self.destination_station.name.casefold():
+            raise ValueError("destination muss der ausgewählten destination_station entsprechen")
         return self
 
 
@@ -244,6 +273,8 @@ class TripRequest(BaseModel):
     max_results: int = Field(default=24, ge=1, le=48)
     flix_origin_stop_id: str | None = None
     flix_destination_stop_id: str | None = None
+    origin_station: StationSelection | None = None
+    destination_station: StationSelection | None = None
     refresh_cache: bool = False
 
     @field_validator("origin", "destination")
@@ -299,6 +330,12 @@ class TripRequest(BaseModel):
 
     @model_validator(mode="after")
     def validate_trip(self):
+        if self.travel_mode == "ground" and bool(self.origin_station) != bool(self.destination_station):
+            raise ValueError("Start- und Zielstation müssen gemeinsam ausgewählt werden")
+        if self.origin_station and self.origin.casefold() != self.origin_station.name.casefold():
+            raise ValueError("origin muss der ausgewählten origin_station entsprechen")
+        if self.destination_station and self.destination.casefold() != self.destination_station.name.casefold():
+            raise ValueError("destination muss der ausgewählten destination_station entsprechen")
         if self.deutschlandticket_only and not self.deutschlandticket:
             raise ValueError("deutschlandticket_only setzt deutschlandticket=true voraus")
         if self.journey_type == "one_way":

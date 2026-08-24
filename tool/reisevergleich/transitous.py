@@ -92,9 +92,15 @@ async def search(request: ReiseRequest, *, deutschlandticket_only: bool = False)
         async with httpx.AsyncClient(timeout=timeout, headers=headers, follow_redirects=True) as client:
             origin_query = provider_location_query(request.origin)
             destination_query = provider_location_query(request.destination)
+            selected_origin = request.origin_station if request.origin_station and request.origin_station.id_for("transitous") else None
+            selected_destination = request.destination_station if request.destination_station and request.destination_station.id_for("transitous") else None
+            async def selected_or_resolve(selection, query):
+                if selection:
+                    return ({"id": selection.id_for("transitous"), "name": selection.name}, selection.name, [selection.name])
+                return await _resolve_stop(client, query)
             origin_result, destination_result = await asyncio.gather(
-                _resolve_stop(client, origin_query),
-                _resolve_stop(client, destination_query),
+                selected_or_resolve(selected_origin, origin_query),
+                selected_or_resolve(selected_destination, destination_query),
             )
             origin, origin_lookup, origin_candidates = origin_result
             destination, destination_lookup, destination_candidates = destination_result

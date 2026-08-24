@@ -89,6 +89,8 @@ async def db_search(
     arrival_before: datetime | None = None,
     bestprice: bool = False,
     not_only_fast_routes: bool = False,
+    origin_id: str | None = None,
+    destination_id: str | None = None,
 ) -> dict[str, Any]:
     departure = datetime.fromisoformat(f"{travel_date}T{departure_after}:00").replace(tzinfo=TZ)
     payload: dict[str, Any] = {
@@ -104,6 +106,10 @@ async def db_search(
     # arrival-based search. The backend receives the flight cutoff separately
     # and filters journeys after a departure-based query.
     payload["departure"] = departure.isoformat()
+    if origin_id:
+        payload["origin_id"] = origin_id
+    if destination_id:
+        payload["destination_id"] = destination_id
     if arrival_before is not None:
         payload["arrival_before"] = arrival_before.astimezone(TZ).isoformat()
     if max_transfers is not None:
@@ -130,10 +136,12 @@ async def db_search_with_retry(
     arrival_before: datetime | None = None,
     bestprice: bool = False,
     not_only_fast_routes: bool = False,
+    origin_id: str | None = None,
+    destination_id: str | None = None,
 ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
     diagnostics: list[dict[str, Any]] = []
     last: dict[str, Any] = {"status": "failed", "journeys": []}
-    location_pairs = list(dict.fromkeys(
+    location_pairs = [(origin, destination)] if origin_id or destination_id else list(dict.fromkeys(
         (origin_candidate, destination_candidate)
         for origin_candidate in location_candidates(origin)
         for destination_candidate in location_candidates(destination)
@@ -152,6 +160,8 @@ async def db_search_with_retry(
                     arrival_before=arrival_before,
                     bestprice=bestprice,
                     not_only_fast_routes=not_only_fast_routes,
+                    origin_id=origin_id,
+                    destination_id=destination_id,
                 )
                 diagnostics.append({
                     "source": "db-api",

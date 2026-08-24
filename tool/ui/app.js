@@ -5,6 +5,7 @@ const state = {
   durationNights: 7,
   dticket: (localStorage.getItem('fareweave-dticket') ?? localStorage.getItem('reisevergleich-dticket')) === 'true',
   hotelType: 'hotel',
+  stations: {origin: null, destination: null},
 };
 
 function localIso(value) {
@@ -173,6 +174,8 @@ function getPayload() {
     travel_mode: state.travelMode === 'ground' ? 'ground' : 'flight',
     origin: $('origin').value.trim(),
     destination: $('destination').value.trim(),
+    origin_station: state.travelMode === 'ground' ? state.stations.origin : null,
+    destination_station: state.travelMode === 'ground' ? state.stations.destination : null,
     departure_date: $('departureDate').value,
     departure_after: $('departureAfter').value,
     return_mode: 'date',
@@ -198,6 +201,54 @@ function getPayload() {
     max_results: 24,
     refresh_cache: $('refreshCache').checked,
   };
+}
+
+const stationTimers = {};
+const stationRequestVersions = {origin:0, destination:0};
+function renderStationSuggestions(field, stations) {
+  const panel = $(`${field}Suggestions`);
+  panel.innerHTML = (stations || []).map((station, index) =>
+    `<button type="button" role="option" data-station-index="${index}"><strong>${esc(station.label || station.name)}</strong><span>${esc({db:'DB',transitous:'International',flix:'Flix'}[station.provider] || station.provider)} · ${esc(station.provider_id)}</span></button>`
+  ).join('');
+  panel.classList.toggle('hidden', !stations?.length);
+  panel.querySelectorAll('button').forEach(button => button.addEventListener('click', () => {
+    selectStation(field, stations[Number(button.dataset.stationIndex)]);
+  }));
+}
+
+function selectStation(field, station) {
+    if (station) {
+    state.stations[field] = {name:station.name, provider:station.provider, provider_id:station.provider_id, provider_ids:station.provider_ids || {[station.provider]:station.provider_id}, latitude:station.latitude, longitude:station.longitude};
+    $(field).value = station.name;
+    $(field).dataset.selected = 'true';
+    $(`${field}Suggestions`).classList.add('hidden');
+    refreshFlixStops();
+  }
+}
+
+async function findStations(field) {
+  const query = $(field).value.trim();
+  if (query.length < 2) return renderStationSuggestions(field, []);
+  const version = ++stationRequestVersions[field];
+  try {
+    const response = await fetch(`/api/stations?q=${encodeURIComponent(query)}&limit=12`);
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const data = await response.json();
+    if (version !== stationRequestVersions[field] || $(field).value.trim() !== query) return;
+    if (data.auto_selection && !data.requires_selection) selectStation(field, data.auto_selection);
+    else renderStationSuggestions(field, data.stations);
+  } catch (_) { renderStationSuggestions(field, []); }
+}
+
+function bindStationInput(field) {
+  $(field).addEventListener('input', () => {
+    stationRequestVersions[field] += 1;
+    state.stations[field] = null;
+    delete $(field).dataset.selected;
+    clearTimeout(stationTimers[field]);
+    stationTimers[field] = setTimeout(() => findStations(field), 250);
+  });
+  $(field).addEventListener('focus', () => { if ($(field).value.trim().length >= 2) findStations(field); });
 }
 
 function replaceStopOptions(select, stops) {
@@ -451,6 +502,10 @@ function render(data) {
 
 async function submit(ev) {
   ev.preventDefault();
+  if (state.travelMode === 'ground' && (!state.stations.origin || !state.stations.destination)) {
+    showMessage('Bitte Start und Ziel aus der Stationsliste auswählen.', 'error');
+    return;
+  }
   if (activeSearch) activeSearch.controller.abort();
   const search = {id: `fw_${Date.now()}_${crypto.getRandomValues(new Uint32Array(1))[0].toString(36)}`, controller: new AbortController(), done:false};
   activeSearch = search;
@@ -491,6 +546,8 @@ function bind() {
   setTodayDefaults();
   syncJourneyDates();
   syncHotelType();
+  bindStationInput('origin');
+  bindStationInput('destination');
   document.querySelectorAll('[data-mode]').forEach(btn => btn.addEventListener('click', () => {
     state.travelMode = btn.dataset.mode;
     document.querySelectorAll('[data-mode]').forEach(x => x.classList.toggle('active', x===btn));

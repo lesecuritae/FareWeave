@@ -297,8 +297,14 @@ def _search_sync(database: Path, request) -> dict[str, Any]:
         stops = list(db.execute("SELECT stop_id,name,parent_station,timezone FROM stop"))
         origins = sorted(((stop_score(request.origin, r["name"]), r) for r in stops), reverse=True, key=lambda pair: pair[0])
         destinations = sorted(((stop_score(request.destination, r["name"]), r) for r in stops), reverse=True, key=lambda pair: pair[0])
-        origin_ids = [r["stop_id"] for score, r in origins if score >= max(60, origins[0][0] - 20)][:24] if origins and origins[0][0] else []
-        destination_ids = [r["stop_id"] for score, r in destinations if score >= max(60, destinations[0][0] - 20)][:24] if destinations and destinations[0][0] else []
+        origin_selection = getattr(request, "origin_station", None)
+        destination_selection = getattr(request, "destination_station", None)
+        selected_origin = origin_selection if origin_selection and origin_selection.id_for("flix") else None
+        selected_destination = destination_selection if destination_selection and destination_selection.id_for("flix") else None
+        explicit_origin_id = selected_origin.id_for("flix") if selected_origin else getattr(request, "flix_origin_stop_id", None)
+        explicit_destination_id = selected_destination.id_for("flix") if selected_destination else getattr(request, "flix_destination_stop_id", None)
+        origin_ids = [explicit_origin_id] if explicit_origin_id else ([r["stop_id"] for score, r in origins if score >= max(60, origins[0][0] - 20)][:24] if origins and origins[0][0] else [])
+        destination_ids = [explicit_destination_id] if explicit_destination_id else ([r["stop_id"] for score, r in destinations if score >= max(60, destinations[0][0] - 20)][:24] if destinations and destinations[0][0] else [])
         if not origin_ids or not destination_ids:
             return {"status": "empty", "routes": [], "candidate_routes": [], "provider_status": {"provider": "flix-gtfs", "ok": True, "error": "Start oder Ziel nicht im Flix-GTFS gefunden"}}
         placeholders_o, placeholders_d = ",".join("?" * len(origin_ids)), ",".join("?" * len(destination_ids))
@@ -358,14 +364,14 @@ async def search(request, *, force_refresh: bool = False) -> dict[str, Any]:
 
 def _stop_suggestions_sync(database: Path, query: str) -> list[dict[str, Any]]:
     with sqlite3.connect(database) as db:
-        rows = db.execute("SELECT stop_id,name,timezone FROM stop").fetchall()
+        rows = db.execute("SELECT stop_id,name,timezone,latitude,longitude FROM stop").fetchall()
     ranked = sorted(((stop_score(query, row[1]), row) for row in rows), reverse=True, key=lambda item: (item[0], item[1][1]))
     output, names = [], set()
     for score, row in ranked:
         normalized = _key(row[1])
         if score < 60 or normalized in names: continue
         names.add(normalized)
-        output.append({"station_id": row[0], "name": row[1], "timezone": row[2]})
+        output.append({"station_id": row[0], "name": row[1], "timezone": row[2], "latitude": row[3], "longitude": row[4]})
         if len(output) >= 12: break
     return output
 

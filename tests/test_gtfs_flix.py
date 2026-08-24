@@ -15,6 +15,7 @@ from reisevergleich.gtfs_flix import (
     _build_database, _search_sync, enrich_live_prices, gtfs_local_datetime,
     gtfs_seconds, service_active, stop_score,
 )
+from reisevergleich.models import StationSelection
 import reisevergleich.gtfs_flix as gtfs_flix
 
 
@@ -108,6 +109,11 @@ with tempfile.TemporaryDirectory() as temporary:
     assert all(len(route["legs"][0].get("stopovers", [])) == 2 for route in result["routes"]), result
     assert any(route["departure"].startswith("2026-08-25T02:15") for route in result["routes"]), result
     assert all(route["price"] is None and route["deutschlandticket_covered"] is False for route in result["routes"])
+    request.origin_station = StationSelection(name="Leipzig central train station", provider="flix", provider_id="L")
+    request.destination_station = StationSelection(name="Dortmund Central Station", provider="flix", provider_id="D")
+    selected = _search_sync(database, request)
+    assert selected["routes"] and all(route["origin"] == "Leipzig central train station" for route in selected["routes"])
+    request.origin_station = request.destination_station = None
     request.departure_after = "17:00"
     later = _search_sync(database, request)
     assert all(route["departure"] >= "2026-08-24T17:00" for route in later["routes"])

@@ -5,7 +5,7 @@ import asyncio
 from reisevergleich import compare
 from reisevergleich.config import SEARCH_DEPARTURE_TOLERANCE_MINUTES
 from reisevergleich.db import rank_routes
-from reisevergleich.models import ReiseRequest
+from reisevergleich.models import ReiseRequest, StationSelection
 from reisevergleich.utils import annotate_departure_tolerance, departure_search_floor, route_departure_in_window
 
 
@@ -62,6 +62,7 @@ def test_compare_queries_all_ground_providers_with_floor_and_keeps_le(monkeypatc
 
     async def fake_db(**kwargs):
         observed["db"] = (kwargs["travel_date"], kwargs["departure_after"])
+        observed["db_ids"] = (kwargs.get("origin_id"), kwargs.get("destination_id"))
         return ({"journeys": [route("db-later", "03:10", source="dbnav", operator="DB Fernverkehr AG")], "source": "dbnav"}, [])
 
     async def fake_transitous(request):
@@ -86,9 +87,20 @@ def test_compare_queries_all_ground_providers_with_floor_and_keeps_le(monkeypatc
         departure_after="03:00",
         max_results=10,
         split_ticket_check=False,
+        origin_station=StationSelection(
+            name="Leipzig Hbf", provider="db", provider_id="8010205",
+            provider_ids={"db":"8010205", "transitous":"leipzig-transitous", "flix":"leipzig-flix"},
+        ),
+        destination_station=StationSelection(
+            name="Frankfurt(Main) Hbf", provider="db", provider_id="8000105",
+            provider_ids={"db":"8000105", "transitous":"frankfurt-transitous", "flix":"frankfurt-flix"},
+        ),
     )
     result = asyncio.run(compare.compare_trip(request))
-    assert observed == {"db": (DATE, "02:45"), "transitous": (DATE, "02:45"), "flix": (DATE, "02:45")}
+    assert observed == {
+        "db": (DATE, "02:45"), "db_ids": ("8010205", "8000105"),
+        "transitous": (DATE, "02:45"), "flix": (DATE, "02:45"),
+    }
     early = next(item for item in result["visible_options"] if item["id"] == "le-232")
     assert early["early_departure_minutes"] == 6
     assert early["legs"][0]["operator"] == "LEO Express"
