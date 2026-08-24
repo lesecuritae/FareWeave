@@ -19,6 +19,27 @@ def test_mapper_extracts_provider_neutral_stops():
     assert [item["name"] for item in mapper.route_waypoints(route)] == ["Berlin Hbf", "Leipzig Hbf", "München Hbf"]
 
 
+def test_mapper_uses_flix_objects_segments_and_confirmed_endpoints():
+    route = {
+        "provider": "FlixTrain",
+        "coverage_origin": {"name":"Leipzig Hbf", "latitude":51.345, "longitude":12.382},
+        "coverage_destination": {"name":"Kamen", "latitude":51.592, "longitude":7.663},
+        "legs": [{"departure":{"station":"Leipzig", "latitude":51.345, "longitude":12.382}, "arrival":{"station":"internal-id"}}],
+        "segments": [
+            {"provider":"DB", "legs":[{"origin":{"name":"Leipzig Hbf"}, "destination":{"name":"Leipzig Messe"}, "stopovers":[
+                {"name":"Leipzig Hbf", "latitude":51.345, "longitude":12.382},
+                {"name":"Leipzig Messe", "latitude":51.396, "longitude":12.389},
+            ]}]},
+            {"provider":"FlixTrain", "legs":[{"departure":{"station":"Leipzig Messe", "latitude":51.396, "longitude":12.389}, "arrival":{"station":"internal-id"}}]},
+        ],
+    }
+    points = mapper.route_waypoints(route)
+    assert points[0]["name"] == "Leipzig Hbf"
+    assert any(item["name"] == "Leipzig Messe" for item in points)
+    assert points[-1]["name"] == "Kamen"
+    assert len(mapper.sample_route(points)) > 2
+
+
 def test_db_stopover_coordinates_reach_mapper():
     route = compact_route({
         "id": "route-1",
@@ -51,7 +72,7 @@ def test_coverage_cache_uses_versioned_route_key(monkeypatch):
     result = asyncio.run(cache.get_or_analyze("known-route", producer))
     assert result == {"status": "ok"}
     assert observed == {
-        "namespace": "coverage-v1.3.0",
+        "namespace": "coverage-v1.4.0",
         "params": {"route_id": "known-route"},
         "ttl": 7 * 24 * 60 * 60,
     }
@@ -75,7 +96,22 @@ def test_analyzer_isolates_provider_failure(monkeypatch):
     monkeypatch.setattr(analyzer, "get_or_analyze", direct)
     result = asyncio.run(analyzer.analyze_route({"origin": "A", "destination": "B"}))
     assert result["status"] == "unavailable"
-    assert result["message"] == "Mobilfunkanalyse momentan nicht verfügbar"
+    assert result["message"] == "Mobilfunkanalyse fehlgeschlagen"
+
+
+def test_missing_route_data_is_not_reported_as_technical_failure(monkeypatch):
+    async def unresolved(_route):
+        return []
+    async def direct(_key, producer):
+        return await producer()
+    monkeypatch.setattr(analyzer, "resolve_waypoints", unresolved)
+    monkeypatch.setattr(analyzer, "get_or_analyze", direct)
+    result = asyncio.run(analyzer.analyze_route({"origin":"A", "destination":"B"}))
+    assert result == {
+        "status":"unavailable",
+        "message":"Mobilfunkdaten für diese Strecke nicht verfügbar",
+        "reason":"route_geometry_missing",
+    }
 
 
 def test_network_summary_and_tunnel_limit(monkeypatch):

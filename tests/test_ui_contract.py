@@ -49,6 +49,8 @@ for needle in [
     "include_feeder: state.travelMode === 'flight'",
     "travel_mode: state.travelMode === 'ground' ? 'ground' : 'flight'",
     "function coverageResultHtml(",
+    "function readableLegTitle(",
+    "function readablePlace(",
     "async function loadCoverage()",
     "Math.min(3, queue.length)",
     "coverageGeneration += 1",
@@ -80,6 +82,12 @@ assert "station.provider_id}</span>" not in js
 assert "data.operator_networks" in js and "data.networks || []" not in js
 for hidden_coverage_text in ["Mindestens 1 Netz", "Mindestens 2 Netze", "Mindestens 3 Netze", "coverage-source"]:
     assert hidden_coverage_text not in js
+assert "Mobilfunkanalyse momentan nicht verfügbar" not in js
+assert "Mobilfunkanalyse fehlgeschlagen" in js
+assert "data?.message" in js
+assert "Unbekannte Teilstrecke" in js
+assert "|| 'Teilstrecke'" not in js
+assert "esc(leg.origin || '')" not in js
 assert "flix_origin_stop_id:" in js and "flix_destination_stop_id:" in js
 assert 'id="includeTrain"' in html and 'id="includeBus"' in html
 assert 'id="includeFlixtrain"' not in html and 'id="includeFlixbus"' not in html

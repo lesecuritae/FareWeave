@@ -271,6 +271,8 @@ def compact_route(route: dict[str, Any], *, include_legs: bool = True) -> dict[s
         "booking_url": route.get("booking_url"),
         "departure_offset_minutes": route.get("departure_offset_minutes"),
         "early_departure_minutes": route.get("early_departure_minutes"),
+        "coverage_origin": route.get("coverage_origin"),
+        "coverage_destination": route.get("coverage_destination"),
     }
     if include_legs:
         legs = []

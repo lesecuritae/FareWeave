@@ -1,4 +1,12 @@
 # Changelog
+## 0.2.7 - 2026-08-24
+
+- FlixTrain-/FlixBus-Stations-, Zeit- und Linienobjekte werden vor der Darstellung normalisiert; `[object Object]`, technische UUIDs und leere Teilstrecken erscheinen nicht mehr.
+- Segmente zeigen Linie und Betreiber, verständliche Start-/Zielnamen oder einen Verkehrsmittelnamen. Nur vollständig informationslose Legs verwenden „Unbekannte Teilstrecke“.
+- Coverage erhält bestätigte Start-/Zielkoordinaten unabhängig vom Provider und bevorzugt vollständige Segment-/Stopover-Geometrien gegenüber unvollständigen Anzeige-Legs.
+- DB-, Transitous-, FlixTrain-, FlixBus- und Mischketten verwenden denselben providerneutralen Coverage-Datenfluss.
+- Fehlende Abdeckungsdaten melden „Mobilfunkdaten für diese Strecke nicht verfügbar“; technische Analyzerfehler melden getrennt „Mobilfunkanalyse fehlgeschlagen“.
+
 ## 0.2.6 - 2026-08-24
 
 - Das Suchformular bietet direkt sichtbare, providerneutrale Auswahlen für Zug und Bus. FareWeave ordnet DB, Transitous, FlixTrain und FlixBus weiterhin intern zu.

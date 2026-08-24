@@ -47,7 +47,7 @@ async def analyze_route(route: dict[str, Any]) -> dict[str, Any]:
             waypoints = await asyncio.wait_for(resolve_waypoints(route), timeout=8)
             points = sample_route(waypoints)
             if len(points) < 2:
-                return {"status": "unavailable", "message": "Mobilfunkanalyse momentan nicht verfügbar", "reason": "route_geometry_missing"}
+                return {"status": "unavailable", "message": "Mobilfunkdaten für diese Strecke nicht verfügbar", "reason": "route_geometry_missing"}
             identifier = route_hash(points)
             coverage = await asyncio.wait_for(sample(points), timeout=12)
             operator_sample = await asyncio.wait_for(sample_operators(points), timeout=25)
@@ -69,7 +69,7 @@ async def analyze_route(route: dict[str, Any]) -> dict[str, Any]:
                     "weak_sections": _gaps(points, values),
                 })
             if not any(item["evaluated_points"] for item in networks):
-                return {"status": "unavailable", "message": "Mobilfunkanalyse momentan nicht verfügbar", "reason": "outside_germany_or_source_unavailable"}
+                return {"status": "unavailable", "message": "Mobilfunkdaten für diese Strecke nicht verfügbar", "reason": "outside_germany_or_source_unavailable"}
             return {
                 "status": "ok",
                 "route_id": identifier,
@@ -106,6 +106,6 @@ async def analyze_route(route: dict[str, Any]) -> dict[str, Any]:
     except Exception as exc:
         return {
             "status": "unavailable",
-            "message": "Mobilfunkanalyse momentan nicht verfügbar",
+            "message": "Mobilfunkanalyse fehlgeschlagen",
             "reason": type(exc).__name__,
         }

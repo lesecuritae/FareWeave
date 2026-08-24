@@ -410,7 +410,7 @@ function groundAlternativesHtml(title, component) {
   const split = component?.split_ticket?.status === "success" ? (component.split_ticket.split_options || []).slice(0, 3) : [];
   if (!mixed.length && !split.length) return "";
   const mixedRows = mixed.map(option => {
-    const segments = (option.segments || []).map(segment => `<div class="timeline-row"><div class="time">${hm(segment.departure)} → ${hm(segment.arrival)}</div><div><strong>${esc(segment.ticket || segment.provider || segment.line || "Teilstrecke")}</strong><div class="meta">${esc(segment.origin || "")} → ${esc(segment.destination || "")}</div></div><div>${segment.paid_price > 0 ? money(segment.paid_price, segment.currency || "EUR") : ""}</div></div>`).join("");
+    const segments = (option.segments || []).map(segment => `<div class="timeline-row"><div class="time">${hm(segment.departure?.time || segment.departure)} → ${hm(segment.arrival?.time || segment.arrival)}</div><div><strong>${esc(segment.ticket || readableLegTitle(segment))}</strong><div class="meta">${esc(readablePlace(segment.origin || segment.departure))} → ${esc(readablePlace(segment.destination || segment.arrival))}</div></div><div>${segment.paid_price > 0 ? money(segment.paid_price, segment.currency || "EUR") : ""}</div></div>`).join("");
     return `<section class="alternative"><div class="alternative-head"><div><span class="badge ticket">Mischverbindung</span><strong>${esc(option.label || option.type || "Getrennte Fahrkarten")}</strong></div><b>${option.price_known ? money(option.total_price, option.currency || "EUR") : "Preis offen"}</b></div><div class="timeline">${segments}</div><p class="meta">${esc(option.price_note || "Die Teilpreise gelten für getrennte Fahrkarten.")}</p></section>`;
   }).join("");
   const splitRows = split.map(option => {
@@ -436,7 +436,7 @@ function reliabilityHtml(connection) {
     const p90 = stats.p90_arrival_delay_minutes;
     const cancellation = stats.cancellation_rate;
     const quality = stats.quality === 'good' ? 'gut' : stats.quality === 'limited' ? 'begrenzt' : 'gering';
-    return `<div class="reliability-leg"><strong>${esc(leg.line || leg.mode || 'Teilstrecke')}</strong><span>${stats.sample_count} historische Fahrten${median !== undefined ? ` · Median ${median >= 0 ? '+' : ''}${esc(median)} min` : ''}${p90 !== undefined ? ` · P90 ${p90 >= 0 ? '+' : ''}${esc(p90)} min` : ''}${cancellation !== undefined ? ` · Ausfälle ${(Number(cancellation) * 100).toFixed(1)} %` : ''} · Datenqualität ${quality}</span></div>`;
+    return `<div class="reliability-leg"><strong>${esc(readableLegTitle(leg))}</strong><span>${stats.sample_count} historische Fahrten${median !== undefined ? ` · Median ${median >= 0 ? '+' : ''}${esc(median)} min` : ''}${p90 !== undefined ? ` · P90 ${p90 >= 0 ? '+' : ''}${esc(p90)} min` : ''}${cancellation !== undefined ? ` · Ausfälle ${(Number(cancellation) * 100).toFixed(1)} %` : ''} · Datenqualität ${quality}</span></div>`;
   }).join('');
   const connectionDetails = (reliability.connections || []).map(item => item.status === 'ok'
     ? `<div class="reliability-leg"><strong>${esc(item.station || 'Anschluss')}</strong><span>${item.scheduled_transfer_minutes} min Umstieg · ${item.approximate ? 'ca. ' : ''}${item.percent} %</span></div>`
@@ -447,7 +447,8 @@ function reliabilityHtml(connection) {
 
 function coverageResultHtml(data) {
   if (!data || data.status !== 'ok') {
-    return '<p class="coverage-unavailable">Mobilfunkanalyse momentan nicht verfügbar</p>';
+    const message = data?.message || 'Mobilfunkanalyse fehlgeschlagen';
+    return `<p class="coverage-unavailable">${esc(message)}</p>`;
   }
   const networks = (data.operator_networks || []).map(network => {
     const percent = network.coverage_percent;
@@ -455,6 +456,39 @@ function coverageResultHtml(data) {
   }).join('');
   if (!networks) return '<p class="coverage-unavailable">Betreiberdaten nicht verfügbar</p>';
   return networks;
+}
+
+function readablePlace(value) {
+  if (!value) return '';
+  const text = typeof value === 'string' ? value : (value.name || value.station || value.city || '');
+  return /^[0-9a-f]{8}-[0-9a-f-]{27,}$/i.test(String(text)) ? '' : text;
+}
+
+function readableMode(value) {
+  const mode = String(value || '').toLowerCase();
+  if (mode.includes('bus') || mode.includes('coach')) return 'Bus';
+  if (mode.includes('regional')) return 'Regionalzug';
+  if (mode.includes('train') || mode.includes('rail')) return 'Zug';
+  if (mode.includes('tram')) return 'Straßenbahn';
+  if (mode.includes('walk')) return 'Fußweg';
+  return '';
+}
+
+function readableLegTitle(leg) {
+  const line = typeof leg.line === 'string' ? leg.line : (leg.line?.name || leg.line?.label || '');
+  const operator = typeof leg.operator === 'string' ? leg.operator : (leg.operator?.name || '');
+  const provider = leg.segment_provider || (typeof leg.provider === 'string' ? leg.provider : leg.provider?.name) || '';
+  const normalizedProvider = /^flixbus$/i.test(provider) && leg.segment_provider ? leg.segment_provider : provider;
+  if (line) return operator && operator !== line ? `${line} · ${operator}` : line;
+  if (normalizedProvider) return normalizedProvider;
+  return readableMode(leg.mode || leg.type) || 'Unbekannte Teilstrecke';
+}
+
+function displayLegs(connection) {
+  if (connection.segments?.length) {
+    return connection.segments.flatMap(segment => (segment.legs?.length ? segment.legs : [segment]).map(leg => ({...leg, segment_provider:segment.provider})));
+  }
+  return connection.legs || [];
 }
 
 async function loadCoverage() {
@@ -495,9 +529,12 @@ function groundConnectionsHtml(title, component) {
     const price = connection.deutschlandticket_covered
       ? '0 € zusätzlich'
       : (connection.price !== undefined ? money(connection.price, connection.currency || 'EUR') : 'Preis offen');
-    const legs = (connection.segments?.length ? connection.segments.flatMap(segment => segment.legs?.length ? segment.legs : [segment]) : (connection.legs || [])).map(leg =>
-      `<div class="timeline-row connection-leg"><div class="time">${hm(leg.departure?.time || leg.departure)} → ${hm(leg.arrival?.time || leg.arrival)}</div><div><strong>${esc(leg.line || leg.mode || 'Teilstrecke')}</strong><div class="meta">${esc(leg.origin || '')} → ${esc(leg.destination || '')}</div></div></div>`
-    ).join('');
+    const display = displayLegs(connection);
+    const legs = display.map((leg, index) => {
+      const origin = readablePlace(leg.origin || leg.departure) || (index === 0 ? readablePlace(connection.origin || connection.coverage_origin) : 'Zwischenhalt');
+      const destination = readablePlace(leg.destination || leg.arrival) || (index === display.length - 1 ? readablePlace(connection.destination || connection.coverage_destination) : 'Zwischenhalt');
+      return `<div class="timeline-row connection-leg"><div class="time">${hm(leg.departure?.time || leg.departure)} → ${hm(leg.arrival?.time || leg.arrival)}</div><div><strong>${esc(readableLegTitle(leg))}</strong><div class="meta">${esc(origin)} → ${esc(destination)}</div></div></div>`;
+    }).join('');
     const transfers = connection.transfers !== undefined
       ? `${connection.transfers} ${connection.transfers === 1 ? 'Umstieg' : 'Umstiege'}`
       : '';

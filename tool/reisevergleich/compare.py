@@ -50,6 +50,19 @@ def _transport_selected(route: dict[str, Any], request: ReiseRequest) -> bool:
     return bool(kinds & enabled)
 
 
+def _attach_coverage_endpoints(routes: list[dict[str, Any]], request: ReiseRequest) -> list[dict[str, Any]]:
+    def endpoint(selection: Any, fallback: str) -> dict[str, Any]:
+        return {
+            "name": fallback,
+            "latitude": getattr(selection, "latitude", None),
+            "longitude": getattr(selection, "longitude", None),
+        }
+
+    origin = endpoint(request.origin_station, request.origin)
+    destination = endpoint(request.destination_station, request.destination)
+    return [{**route, "coverage_origin": origin, "coverage_destination": destination} for route in routes]
+
+
 async def _enrich_history_bounded(routes: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Keep optional history I/O outside the critical search latency path."""
     try:
@@ -235,6 +248,8 @@ async def compare_trip(request: ReiseRequest) -> dict[str, Any]:
         )
     ]
     flix_routes = await complete_flix_routes(flix_routes, request)
+    db_routes = _attach_coverage_endpoints(db_routes, request)
+    flix_routes = _attach_coverage_endpoints(flix_routes, request)
 
     # Historie ist eine unabhängige, rein additive Schicht. Fehler oder Timeouts
     # dürfen Providerresultate, Preise und Ranking niemals verändern.

@@ -26,6 +26,18 @@ async def check_viewport(browser, width: int, height: int) -> None:
     page.on("console", lambda message: errors.append(f"console:{message.type}:{message.text}") if message.type == "error" else None)
     page.on("pageerror", lambda error: errors.append(f"page:{error}"))
     await page.goto(BASE_URL, wait_until="networkidle")
+    segment_labels = await page.evaluate("""() => ({
+      flix: readableLegTitle({provider:'flixbus', segment_provider:'FlixTrain', type:'train'}),
+      regional: readableLegTitle({line:'RE13', operator:'DB Regio AG Südost', mode:'train'}),
+      bus: readableLegTitle({type:'bus'}),
+      station: readablePlace({station:'Leipzig Messe'}),
+      technical: readablePlace({station:'68c5db74-0034-41b2-b3ae-6947c837f77b'})
+    })""")
+    assert segment_labels == {
+        "flix":"FlixTrain", "regional":"RE13 · DB Regio AG Südost",
+        "bus":"Bus", "station":"Leipzig Messe", "technical":"",
+    }
+    assert "[object Object]" not in str(segment_labels)
     assert await page.locator("body").evaluate("el => el.scrollWidth <= el.clientWidth"), f"horizontale Überbreite bei {width}x{height}"
     if width <= 620:
         assert await page.locator(".topbar").evaluate("el => getComputedStyle(el).position") == "static"

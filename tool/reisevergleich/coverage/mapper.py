@@ -30,7 +30,7 @@ def _name(value: Any) -> str | None:
     if isinstance(value, str):
         return value.strip() or None
     if isinstance(value, dict):
-        return str(value.get("name") or value.get("station") or "").strip() or None
+        return str(value.get("name") or value.get("station") or value.get("city") or "").strip() or None
     return None
 
 
@@ -54,7 +54,7 @@ def route_waypoints(route: dict[str, Any]) -> list[dict[str, Any]]:
             return points
 
     legs = route.get("legs") if isinstance(route.get("legs"), list) else []
-    if not legs and isinstance(route.get("segments"), list):
+    if isinstance(route.get("segments"), list) and route["segments"]:
         legs = [
             child
             for segment in route["segments"]
@@ -63,6 +63,8 @@ def route_waypoints(route: dict[str, Any]) -> list[dict[str, Any]]:
             if isinstance(child, dict)
         ]
     values: list[Any] = []
+    if route.get("coverage_origin"):
+        values.append(route["coverage_origin"])
     for leg in legs:
         if not isinstance(leg, dict):
             continue
@@ -70,7 +72,12 @@ def route_waypoints(route: dict[str, Any]) -> list[dict[str, Any]]:
         if stopovers:
             values.extend(stopovers)
         else:
-            values.extend((leg.get("origin") or leg.get("from"), leg.get("destination") or leg.get("to")))
+            values.extend((
+                leg.get("origin") or leg.get("from") or leg.get("departure"),
+                leg.get("destination") or leg.get("to") or leg.get("arrival"),
+            ))
+    if route.get("coverage_destination"):
+        values.append(route["coverage_destination"])
     if not values:
         values = [route.get("origin"), route.get("destination")]
 
