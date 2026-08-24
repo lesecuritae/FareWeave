@@ -2,6 +2,7 @@
 ## 0.2.1 - 2026-08-24
 
 - Technische Stations-, Provider- und Datenbank-IDs aus den Suchvorschlägen entfernt; angezeigt werden nur Stationsname und Ort/Land.
+- Stationsranking priorisiert exakte Namen, Haupt-/Parent-Stationen und zentrale Bahnhöfe vor Ausgängen, Zugängen, Bahnsteigen und technischen Teilstationen; `Görlitz Hbf` ist live regressionsgeprüft.
 - Mobilfunkbereich in Fahrtkarten deutlich kompakter gestaltet und Quellen-, Lizenz- sowie Methodentexte aus der Kartenansicht entfernt.
 - Mobilfunkdarstellung auf einzelne Betreiberwerte vorbereitet; Schwellenwerte wie „mindestens 1/2/3 Netze“ werden nicht mehr in der Oberfläche ausgegeben. Der aktuelle anbieterneutrale BNetzA-Raster wird nicht fälschlich einzelnen Betreibern zugeschrieben.
 - OpenCellID als optionale Betreiberquelle mit MCC/MNC-Zuordnung, Vollstreckenprüfung, Qualitätsgrenze und Versorgungslückenerkennung ergänzt; lokale CSV-Downloads und berechtigte API-Zugriffe sind konfigurierbar.
