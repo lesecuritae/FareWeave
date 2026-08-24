@@ -9,10 +9,10 @@ import httpx
 from .cache import cached_call
 from .config import APP_VERSION, DB_API_URL, TRANSITOUS_TIMEOUT, TRANSITOUS_URL, TRANSITOUS_USER_AGENT
 from .gtfs_flix import discover_stops
-from .location_resolver import exact_location_key, location_candidates, location_key
+from .location_resolver import exact_location_key, has_airport_context, location_candidates, location_key
 
 _CACHE_TTL = 300
-_RANKING_GENERATION = "stations-v4"
+_RANKING_GENERATION = "stations-v8"
 
 
 def _base_station_query(value: str) -> str:
@@ -38,10 +38,17 @@ _SECONDARY_STATION_WORDS = {
 
 def _station_role_score(name: str, item: dict[str, Any] | None = None) -> int:
     words = set(exact_location_key(name).replace("-", " ").split())
-    score = 180 if words & {"hbf", "hauptbahnhof", "central", "centrale", "centraal"} else 0
+    score = 400 if words & {"hbf", "hauptbahnhof", "central", "centrale", "centraal"} else 0
     if words & _SECONDARY_STATION_WORDS:
         score -= 350
     item = item or {}
+    modes = {str(mode).upper() for mode in item.get("modes") or []}
+    if modes & {"HIGHSPEED_RAIL", "LONG_DISTANCE", "NIGHT_RAIL"}:
+        score += 260
+    elif "REGIONAL_RAIL" in modes:
+        score += 90
+    if "COACH" in modes:
+        score += 120
     if item.get("parent_station"):
         score -= 220
     if str(item.get("location_type") or "") == "1" or item.get("is_station") is True:
@@ -53,12 +60,9 @@ def _score(query: str, name: str, provider: str, item: dict[str, Any] | None = N
     exact_query, exact_name = exact_location_key(query), exact_location_key(name)
     alias_query, alias_name = location_key(query), location_key(name)
     score = {"db": 30, "transitous": 20, "flix": 10}.get(provider, 0)
-    candidates = location_candidates(query)
-    canonical = candidates[1] if len(candidates) > 1 and len(exact_location_key(candidates[1]).split()) > 1 else None
-    if canonical and exact_location_key(name) == exact_location_key(canonical):
-        return score + 1200 + _station_role_score(name, item)
     if exact_query == exact_name:
-        return score + 1000 + _station_role_score(name, item)
+        city_only_penalty = 450 if len(exact_query.split()) == 1 else 0
+        return score + 1000 - city_only_penalty + _station_role_score(name, item)
     if exact_location_key(_base_station_query(query)) == exact_name:
         return score + 850 + _station_role_score(name, item)
     if exact_name.startswith(exact_query + " "):
@@ -144,6 +148,8 @@ async def _search_uncached(normalized: str, limit: int) -> dict[str, Any]:
     groups: list[dict[str, Any]] = []
     seen: set[tuple[str, str]] = set()
     for item in sorted(candidates, key=lambda entry: (-_score(normalized, entry["name"], entry["provider"], entry), entry["name"])):
+        if not has_airport_context(normalized) and has_airport_context(item["name"]):
+            continue
         if (
             item.get("is_station") is True
             and exact_location_key(item["name"]) == exact_location_key(base_query)
@@ -181,14 +187,7 @@ async def _search_uncached(normalized: str, limit: int) -> dict[str, Any]:
         item["type"] = "airport" if "airport" in location_key(item["name"]).split() or "flughafen" in location_key(item["name"]).split() else "station"
         item["confidence"] = round(min(0.99, max(0.01, score / 1050)), 2)
     explicit_station = any(token in exact_location_key(normalized).split() for token in {"hbf", "hauptbahnhof", "bahnhof", "station", "zob", "terminal", "airport", "flughafen"})
-    safe_alias_inputs = {
-        "münchen", "munchen", "muenchen", "munich", "köln", "koln", "koeln", "cologne", "zürich", "zurich", "zuerich",
-        "wien", "prag", "prague", "mailand", "milan", "rom", "rome",
-    }
-    top_score = _score(normalized, ranked[0]["name"], ranked[0]["provider"], ranked[0]) if ranked else 0
-    second_score = _score(normalized, ranked[1]["name"], ranked[1]["provider"], ranked[1]) if len(ranked) > 1 else -1
-    alias_is_safe = exact_location_key(normalized) in safe_alias_inputs and top_score - second_score >= 100
-    auto = ranked[0] if ranked and (len(ranked) == 1 or explicit_station or alias_is_safe) else None
+    auto = ranked[0] if ranked and explicit_station else None
     return {
         "query": normalized, "stations": ranked, "provider_status": statuses,
         "requires_selection": bool(ranked and not auto),

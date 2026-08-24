@@ -93,7 +93,7 @@ assert html.count("flight-option") == 5
 assert 'class="check flight-option"' in html
 assert "querySelectorAll('.flight-option')" in js
 
-assert html.count("feeder-option") == 3
+assert html.count("feeder-option") == 2
 assert "querySelectorAll('.feeder-option')" in js
 assert "isGround && option.classList.contains('flight-option')" in js
 assert "ticketPanel').classList.toggle('disabled'" not in js
@@ -114,12 +114,17 @@ for undersized in range(10, 16):
 assert "function dateDifferenceInDays(start, end)" in js
 assert "state.journeyType = returnDate ? 'round_trip' : 'one_way'" in js
 assert "return_mode: 'date'" in js
-assert "duration_value: state.durationNights" in js
+assert "duration_value: state.journeyType === 'one_way' ? 0 : state.durationNights" in js
 assert "return_date: state.journeyType === 'round_trip' ? $('returnDate').value : null" in js
 assert "openCalendar('departureDate')" in js and "openCalendar('returnDate')" in js
 assert 'id="oneWayButton"' in html
 assert "$('oneWayButton').addEventListener('click'" in js
 assert "$('returnDate').value = ''" in js
+assert "$('returnDate').disabled = state.journeyType === 'one_way'" in js
+assert "$('returnCalendarToggle').disabled = state.journeyType === 'one_way'" in js
+assert 'id="returnDisabledHint"' in html
+assert 'class="check split-ticket-choice"' in html
+assert html.index('id="splitTicket"') < html.index('<details class="advanced">')
 
 for credit in ["Entwickelt von lesecuritae", "Mit Vibe-Coding-Unterstützung", "Nutzt trvl für ausgewählte Providerabfragen", "https://github.com/MikkoParkkola/trvl"]:
     assert credit in html

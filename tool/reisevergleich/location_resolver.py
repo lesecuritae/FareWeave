@@ -23,18 +23,7 @@ CITY_ALIASES = {
     "laibach": "ljubljana", "agram": "zagreb", "pressburg": "bratislava",
 }
 
-AIRPORT_WORDS = {"airport", "flughafen", "aeroport", "terminal"}
-
-CENTRAL_STATIONS = {
-    "munich": "München Hbf",
-    "cologne": "Köln Hbf",
-    "zurich": "Zürich HB",
-    "vienna": "Wien Hbf",
-    "prague": "Praha hlavní nádraží",
-    "milan": "Milano Centrale",
-    "rome": "Roma Termini",
-}
-
+AIRPORT_WORDS = {"airport", "flughafen", "flugplatz", "aeroport", "terminal"}
 
 def exact_location_key(value: str | None) -> str:
     return " ".join(re.findall(r"[^\W_]+", str(value or "").casefold(), flags=re.UNICODE))
@@ -54,26 +43,38 @@ def location_key(value: str | None) -> str:
 def has_airport_context(value: str | None) -> bool:
     text = str(value or "").strip()
     tokens = set(exact_location_key(text).split())
-    return bool(re.fullmatch(r"[A-Z]{3}", text) or AIRPORT_WORDS.intersection(tokens))
+    return bool(
+        re.fullmatch(r"[A-Z]{3}", text)
+        or AIRPORT_WORDS.intersection(tokens)
+        or any(token.startswith(("airport", "flugh", "aeroport")) for token in tokens)
+    )
 
 
 def location_candidates(value: str | None) -> tuple[str, ...]:
-    """Exact user text first, translated city spelling only as fallback."""
+    """Exact user text first, translated spelling only as another place query.
+
+    A city spelling must never be expanded to one particular station.  The
+    provider catalogs return the actual stops and the user chooses among them.
+    """
     text = str(value or "").strip()
     if not text or has_airport_context(text):
         return (text,)
     translated = location_key(text)
-    canonical = CENTRAL_STATIONS.get(translated) if len(exact_location_key(text).split()) == 1 else None
     translated_fallback = translated if exact_location_key(translated) != exact_location_key(text) else None
-    return tuple(dict.fromkeys(candidate for candidate in (text, canonical, translated_fallback) if candidate))
+    return tuple(dict.fromkeys(candidate for candidate in (text, translated_fallback) if candidate))
 
 
 def location_match_is_safe(requested: str, resolved: str | None) -> bool:
-    """Reject an ambiguous city hit until its canonical station fallback runs."""
-    translated = location_key(requested)
-    canonical = CENTRAL_STATIONS.get(translated) if len(exact_location_key(requested).split()) == 1 else None
-    if not canonical:
-        return True
+    """Reject unrelated place hits without relying on a canonical station map."""
+    requested_key = location_key(requested)
     resolved_key = location_key(resolved)
-    canonical_tokens = set(location_key(canonical).split())
-    return bool(resolved_key == location_key(canonical) or canonical_tokens <= set(resolved_key.split()))
+    if not requested_key or not resolved_key:
+        return False
+    requested_tokens = set(requested_key.split())
+    resolved_tokens = set(resolved_key.split())
+    if not requested_tokens <= resolved_tokens:
+        return False
+    if len(exact_location_key(requested).split()) != 1:
+        return True
+    station_words = {"hbf", "hauptbahnhof", "bahnhof", "station", "zob", "terminal", "centrale", "centraal"}
+    return resolved_key == requested_key or bool(station_words & resolved_tokens)

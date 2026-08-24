@@ -69,6 +69,7 @@ function closeCalendar() {
 }
 
 function openCalendar(target) {
+  if ($(target).disabled) return;
   calendarTarget = target;
   const selected = $(target).value || $(target).min || $('departureDate').value;
   const [year, month] = selected.split('-').map(Number);
@@ -104,9 +105,15 @@ function syncJourneyDates() {
   $('returnDate').min = departure;
   const nights = dateDifferenceInDays(departure, returnDate);
   state.journeyType = returnDate ? 'round_trip' : 'one_way';
-  state.durationNights = nights;
+  if (nights !== null && nights >= 0) state.durationNights = nights;
   $('oneWayButton').classList.toggle('active', state.journeyType === 'one_way');
   $('oneWayButton').setAttribute('aria-pressed', String(state.journeyType === 'one_way'));
+  $('oneWayButton').textContent = state.journeyType === 'one_way' ? 'Hin- & Rückfahrt' : 'Nur Hinfahrt';
+  $('returnDate').disabled = state.journeyType === 'one_way';
+  $('returnCalendarToggle').disabled = state.journeyType === 'one_way';
+  $('returnDisabledHint').classList.toggle('hidden', state.journeyType !== 'one_way');
+  $('returnDate').closest('.return-field').classList.toggle('disabled', state.journeyType === 'one_way');
+  if (state.journeyType === 'one_way' && calendarTarget === 'returnDate') closeCalendar();
   $('returnDate').setCustomValidity(nights !== null && nights < 0 ? 'Die Rückreise darf nicht vor der Abreise liegen.' : '');
   syncTravelMode();
 }
@@ -264,7 +271,7 @@ function getPayload() {
     departure_date: $('departureDate').value,
     departure_after: $('departureAfter').value,
     return_mode: 'date',
-    duration_value: state.durationNights,
+    duration_value: state.journeyType === 'one_way' ? 0 : state.durationNights,
     duration_unit: 'nights',
     return_date: state.journeyType === 'round_trip' ? $('returnDate').value : null,
     deutschlandticket: state.travelMode !== 'flight_stay' && state.dticket,
@@ -620,7 +627,15 @@ function bind() {
   $('calendarPrevious').addEventListener('click', () => { calendarMonth = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth()-1, 1); renderCalendar(); });
   $('calendarNext').addEventListener('click', () => { calendarMonth = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth()+1, 1); renderCalendar(); });
   $('oneWayButton').addEventListener('click', () => {
-    $('returnDate').value = '';
+    if (state.journeyType === 'one_way') {
+      const departure = new Date(`${$('departureDate').value}T12:00:00`);
+      departure.setDate(departure.getDate() + Math.max(1, state.durationNights || 7));
+      $('returnDate').value = localIso(departure);
+    } else {
+      const previousNights = dateDifferenceInDays($('departureDate').value, $('returnDate').value);
+      state.durationNights = previousNights !== null && previousNights > 0 ? previousNights : 7;
+      $('returnDate').value = '';
+    }
     syncJourneyDates();
   });
   $('searchForm').addEventListener('submit', submit);

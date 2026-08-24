@@ -1,4 +1,12 @@
 # Changelog
+## 0.2.5 - 2026-08-24
+
+- Feste Stadt→Hauptbahnhof-Zuweisungen wurden aus dem Ortsresolver entfernt. Reine Städteingaben liefern immer eine Kandidatenliste und werden nie automatisch auf eine einzelne Station festgelegt.
+- Schreibvarianten und Übersetzungen wie München/Muenchen/Munich oder Wien/Vienna bleiben reine Suchnormalisierung; sie erzeugen keine feste Stationsidentität.
+- Haupt- und Fernverkehrsstationen werden anhand allgemeiner Stationsmerkmale und Provider-Verkehrsarten priorisiert. Flughäfen erscheinen nur bei erkennbarem Flughafen-Kontext.
+- „Nur Hinfahrt“ deaktiviert und dimmt Rückreisedatum sowie Kalenderbutton. Beim Zurückschalten wird eine gültige positive Reisedauer wiederhergestellt; Einweg-Payloads senden stets Dauer `0`.
+- Die Split-Ticket-Suche ist als kleiner, direkt sichtbarer Haken im Reiseformular aktivierbar und nicht mehr unter „Weitere Optionen“ versteckt.
+
 ## 0.2.3 - 2026-08-24
 
 - Flix-Liveverbindungen mit Umstiegen werden als eigenständige Fahrten übernommen, wenn der direkte GTFS-Fahrplan keine durchgehende `trip_id` besitzt; Leipzig–Dresden–Görlitz bleibt als reale Regression abgedeckt.

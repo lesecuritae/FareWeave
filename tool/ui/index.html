@@ -51,6 +51,7 @@
           <label class="field return-field">
             <span>Rückreise <small>(optional)</small></span>
             <div class="date-input-row"><input id="returnDate" type="text" inputmode="none" readonly><button id="returnCalendarToggle" class="calendar-toggle" type="button" aria-expanded="false" aria-controls="calendarPanel">Wählen</button></div>
+            <small id="returnDisabledHint" class="return-disabled-hint hidden">Rückreise deaktiviert – nur Hinfahrt ausgewählt</small>
           </label>
           <button id="oneWayButton" type="button" class="secondary one-way-button" aria-pressed="false">Nur Hinfahrt</button>
           <label class="field compact departure-time-field">
@@ -82,6 +83,7 @@
           <div class="transport-choices">
             <label class="check"><input id="includeFlixtrain" type="checkbox" checked> FlixTrain</label>
             <label class="check"><input id="includeFlixbus" type="checkbox" checked> FlixBus</label>
+            <label class="check split-ticket-choice"><input id="splitTicket" type="checkbox" checked> Split-Ticket-Suche</label>
           </div>
         </section>
 
@@ -128,7 +130,6 @@
         <details class="advanced">
           <summary>Weitere Optionen</summary>
           <div class="advanced-grid">
-            <label class="check feeder-option"><input id="splitTicket" type="checkbox" checked> Split-Tickets prüfen</label>
             <label class="check flight-option"><input id="destinationTransfer" type="checkbox" checked> Flughafen-Transfer</label>
             <label class="field flight-option">
               <span>Abflughafen IATA optional</span>

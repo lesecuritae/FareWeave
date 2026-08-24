@@ -60,7 +60,7 @@ def test_catalog_automatically_uses_an_exact_station_among_multiple_hits(monkeyp
     assert result["auto_selection"]["provider_alias_ids"] == {"db":["8010205"], "transitous":["de:hbf"]}
 
 
-def test_catalog_automatically_uses_an_unambiguous_alias(monkeypatch):
+def test_catalog_requires_choice_even_for_one_city_result(monkeypatch):
     async def db(_query):
         return [{"provider":"db", "provider_id":"8000261", "name":"München Hbf", "latitude":48.14, "longitude":11.56}]
     async def transitous(_query):
@@ -73,8 +73,8 @@ def test_catalog_automatically_uses_an_unambiguous_alias(monkeypatch):
     monkeypatch.setattr(station_catalog, "cached_call", direct_cache)
     result = asyncio.run(station_catalog.search_stations("Munich"))
     assert len(result["stations"]) == 1
-    assert result["requires_selection"] is False
-    assert result["auto_selection"]["provider_ids"] == {"db":"8000261", "transitous":"de:munich"}
+    assert result["requires_selection"] is True
+    assert result["auto_selection"] is None
 
 
 def test_main_stations_rank_before_exits_and_child_stops(monkeypatch):
@@ -97,11 +97,33 @@ def test_main_stations_rank_before_exits_and_child_stops(monkeypatch):
     assert city["stations"][0]["name"] == "Görlitz Hbf"
 
 
+def test_city_requires_choice_ranks_main_station_and_hides_airport(monkeypatch):
+    async def db(_query):
+        return [
+            {"provider":"db", "provider_id":"city", "name":"München", "latitude":48.13, "longitude":11.57, "is_station":True},
+            {"provider":"db", "provider_id":"hbf", "name":"München Hbf", "latitude":48.14, "longitude":11.56, "is_station":True},
+            {"provider":"db", "provider_id":"ost", "name":"München Ost", "latitude":48.13, "longitude":11.60, "is_station":True},
+            {"provider":"db", "provider_id":"airport", "name":"München Flughafen Terminal", "latitude":48.35, "longitude":11.78, "is_station":True},
+        ]
+    async def empty(_query): return []
+    monkeypatch.setattr(station_catalog, "_db_locations", db)
+    monkeypatch.setattr(station_catalog, "_transitous_locations", empty)
+    monkeypatch.setattr(station_catalog, "_flix_locations", empty)
+    async def direct_cache(_namespace, _key, _ttl, producer): return await producer()
+    monkeypatch.setattr(station_catalog, "cached_call", direct_cache)
+    result = asyncio.run(station_catalog.search_stations("München"))
+    assert result["stations"][0]["name"] == "München Hbf"
+    assert "München Ost" in {item["name"] for item in result["stations"]}
+    assert all("Flughafen" not in item["name"] for item in result["stations"])
+    assert result["requires_selection"] is True and result["auto_selection"] is None
+
+
 def test_known_central_station_names_have_no_secondary_penalty():
     for name in ("Leipzig Hbf", "Berlin Hbf", "Frankfurt(Main) Hbf", "Kassel-Wilhelmshöhe"):
         assert station_catalog._station_role_score(name, {"is_station": True}) >= 100
     for name in ("Görlitz Hbf Südausgang", "Berlin Hbf Eingang", "Kassel-Wilhelmshöhe Bahnsteig 1"):
         assert station_catalog._station_role_score(name) < 0
+    assert station_catalog._station_role_score("München Ost", {"modes":["LONG_DISTANCE"]}) > station_catalog._station_role_score("München Harras", {"modes":["SUBURBAN"]})
 
 
 def test_catalog_keeps_multiple_flix_ids_for_one_station_complex(monkeypatch):
