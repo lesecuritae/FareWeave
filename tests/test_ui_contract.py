@@ -73,14 +73,18 @@ assert "position:static" in css
 assert 'id="searchProgress"' in html
 assert "X-Search-ID" in js
 assert "controller.abort()" in js
-assert "progressLabels" in js and "Flix-Fahrplan" in js and "Ergebnisaufbereitung" in js
+assert "progressLabels" in js and "Fernbus- und Zugfahrplan" in js and "Ergebnisaufbereitung" in js
+for technical_provider_label in ["Deutsche Bahn', transitous", "Flix-Fahrplan", "FlixBus', flixtrain", "Provider direkt auswählen"]:
+    assert technical_provider_label not in js + html
 assert "station.provider_id}</span>" not in js
 assert "data.operator_networks" in js and "data.networks || []" not in js
 for hidden_coverage_text in ["Mindestens 1 Netz", "Mindestens 2 Netze", "Mindestens 3 Netze", "coverage-source"]:
     assert hidden_coverage_text not in js
-assert "Keine Flix-Verbindung verfügbar" in js
 assert "flix_origin_stop_id:" in js and "flix_destination_stop_id:" in js
-assert 'id="includeFlixtrain"' in html and 'id="includeFlixbus"' in html
+assert 'id="includeTrain"' in html and 'id="includeBus"' in html
+assert 'id="includeFlixtrain"' not in html and 'id="includeFlixbus"' not in html
+assert "include_flixtrain: state.travelMode !== 'flight_stay' && $('includeTrain').checked" in js
+assert "include_flixbus: state.travelMode !== 'flight_stay' && $('includeBus').checked" in js
 assert 'class="transport-panel feeder-option"' in html
 assert 'id="flixOriginStop"' not in html and "/api/flix-stops" not in js
 
@@ -124,7 +128,9 @@ assert "$('returnDate').disabled = state.journeyType === 'one_way'" in js
 assert "$('returnCalendarToggle').disabled = state.journeyType === 'one_way'" in js
 assert 'id="returnDisabledHint"' in html
 assert 'class="check split-ticket-choice"' in html
-assert html.index('id="splitTicket"') < html.index('<details class="advanced">')
+assert html.index('id="splitTicket"') < html.index('id="ticketPanel"')
+assert html.index('id="searchButton"') < html.index('<details class="advanced">')
+assert "Weitere Optionen" not in html and "Technische Einstellungen" in html
 
 for credit in ["Entwickelt von lesecuritae", "Mit Vibe-Coding-Unterstützung", "Nutzt trvl für ausgewählte Providerabfragen", "https://github.com/MikkoParkkola/trvl"]:
     assert credit in html

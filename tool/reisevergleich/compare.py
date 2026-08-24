@@ -24,8 +24,30 @@ def _provider_state(provider: str, *, ok: bool, result_count: int = 0, skipped: 
         outcome = "connection_found" if result_count else "no_connection"
         message = "Verbindung gefunden" if result_count else "Keine Verbindung verfügbar"
     else:
-        outcome, message = "technical_error", "Technischer Abruffehler"
+        outcome = "technical_error"
+        message = "Flix konnte nicht geprüft werden" if provider == "Flix" else "Technischer Abruffehler"
     return {"provider": provider, "outcome": outcome, "message": message, "result_count": result_count}
+
+
+def _route_transport_kinds(route: dict[str, Any]) -> set[str]:
+    values = [route.get("type"), route.get("mode"), route.get("flix_kind"), route.get("product")]
+    for collection in (route.get("legs"), route.get("segments")):
+        for item in collection or []:
+            if isinstance(item, dict):
+                values.extend((item.get("type"), item.get("mode"), item.get("product"), item.get("line")))
+    text = " ".join(str(value or "").casefold() for value in values)
+    kinds: set[str] = set()
+    if any(token in text for token in ("bus", "coach", "fernlinienbus")): kinds.add("bus")
+    if any(token in text for token in ("train", "rail", "zug", "ice", "intercity", "regional", "tram", "s-bahn", "suburban")): kinds.add("train")
+    return kinds
+
+
+def _transport_selected(route: dict[str, Any], request: ReiseRequest) -> bool:
+    kinds = _route_transport_kinds(route)
+    if not kinds:
+        return True
+    enabled = ({"train"} if request.include_train else set()) | ({"bus"} if request.include_bus else set())
+    return bool(kinds & enabled)
 
 
 async def _enrich_history_bounded(routes: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -189,21 +211,25 @@ async def compare_trip(request: ReiseRequest) -> dict[str, Any]:
     transitous_routes = transitous_result.get("routes") or []
     if transitous_routes:
         db_source = f"{db_source}+transitous" if db_routes and db_source else "transitous"
-    scheduled_routes = [*db_routes, *transitous_routes]
-    db_routes = [
+    def selected_scheduled(routes: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        return [
         annotate_departure_tolerance(route, request.travel_date, request.departure_after)
-        for route in scheduled_routes
-        if route_departure_in_window(
+        for route in routes
+        if _transport_selected(route, request) and route_departure_in_window(
             route, request.travel_date, request.departure_after,
             tolerance_minutes=SEARCH_DEPARTURE_TOLERANCE_MINUTES,
         )
-    ]
+        ]
+
+    selected_db_routes = selected_scheduled(db_routes)
+    selected_transitous_routes = selected_scheduled(transitous_routes)
+    db_routes = [*selected_db_routes, *selected_transitous_routes]
 
     flix_routes = flix_result.get("candidate_routes") or flix_result.get("routes") or []
     flix_routes = [
         annotate_departure_tolerance(route, request.travel_date, request.departure_after)
         for route in flix_routes
-        if route_departure_in_window(
+        if _transport_selected(route, request) and route_departure_in_window(
             route, request.travel_date, request.departure_after,
             tolerance_minutes=SEARCH_DEPARTURE_TOLERANCE_MINUTES,
         )
@@ -290,11 +316,11 @@ async def compare_trip(request: ReiseRequest) -> dict[str, Any]:
         "provider_statuses": [
             _provider_state(
                 "DB", ok=any(item.get("ok") for item in db_attempts),
-                skipped=all(item.get("skipped") for item in db_attempts), result_count=len(db_routes),
+                skipped=all(item.get("skipped") for item in db_attempts), result_count=len(selected_db_routes),
             ),
             _provider_state(
                 "Transitous", ok=bool((transitous_diagnostic or {}).get("ok")),
-                skipped=bool((transitous_diagnostic or {}).get("skipped")), result_count=len(transitous_routes),
+                skipped=bool((transitous_diagnostic or {}).get("skipped")), result_count=len(selected_transitous_routes),
             ),
             _provider_state(
                 "Flix", ok=bool((flix_result.get("provider_status") or {}).get("ok")),
@@ -439,6 +465,8 @@ async def compare_ground_round_trip(
     flix_destination_stop_id: str | None = None,
     origin_station=None,
     destination_station=None,
+    include_train: bool = True,
+    include_bus: bool = True,
 ) -> dict[str, Any]:
     if deutschlandticket_mode == "only":
         outward_dt = await deutschlandticket(DeutschlandticketRequest(
@@ -522,6 +550,8 @@ async def compare_ground_round_trip(
         travel_date=outbound_date,
         departure_after=departure_after,
         preference=preference,
+        include_train=include_train,
+        include_bus=include_bus,
         include_flixtrain=include_flixtrain,
         include_flixbus=include_flixbus,
         max_transfers=max_transfers,
@@ -598,6 +628,8 @@ async def compare_ground_round_trip(
         travel_date=return_date,
         departure_after=departure_after,
         preference=preference,
+        include_train=include_train,
+        include_bus=include_bus,
         include_flixtrain=include_flixtrain,
         include_flixbus=include_flixbus,
         max_transfers=max_transfers,

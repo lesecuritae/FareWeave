@@ -1,4 +1,13 @@
 # Changelog
+## 0.2.6 - 2026-08-24
+
+- Das Suchformular bietet direkt sichtbare, providerneutrale Auswahlen für Zug und Bus. FareWeave ordnet DB, Transitous, FlixTrain und FlixBus weiterhin intern zu.
+- Zug-only, Bus-only und die kombinierte Suche filtern die tatsächlich sichtbaren Verbindungen; mindestens ein Verkehrsmittel bleibt ausgewählt.
+- Die Split-Ticket-Prüfung bleibt als kleiner Haken direkt unter der Verkehrsmittelauswahl sichtbar und wird ohne ausgewählte Zugreise deaktiviert.
+- Technische Providernamen wurden aus Suchfortschritt und Leerzuständen entfernt. Erfolgreiche Prüfungen ohne Treffer bleiben von technischen Abruffehlern getrennt.
+- Flix meldet intern eindeutig „Keine Verbindung verfügbar“ oder „Flix konnte nicht geprüft werden“. Stationswahl und GTFS-Zuordnung bleiben automatisch.
+- „Weitere Optionen“ wurde entfernt. Seltene Cache- und Flugeinstellungen stehen nach dem Suchbutton unter „Technische Einstellungen“.
+
 ## 0.2.5 - 2026-08-24
 
 - Feste Stadt→Hauptbahnhof-Zuweisungen wurden aus dem Ortsresolver entfernt. Reine Städteingaben liefern immer eine Kandidatenliste und werden nie automatisch auf eine einzelne Station festgelegt.

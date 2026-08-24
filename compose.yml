@@ -23,7 +23,7 @@ services:
     container_name: fareweave-db-api
     environment:
       PORT: "3001"
-      USER_AGENT: fareweave/0.2.5
+      USER_AGENT: fareweave/0.2.6
       DB_CFFI_BRIDGE_URL: http://app:8000/internal/db-cffi/request
       DB_CFFI_TOKEN: "${DB_CFFI_TOKEN:-}"
       DB_CFFI_TOKEN_FILE: /run/fareweave-secrets/db_cffi_token

@@ -73,11 +73,15 @@ button { cursor: pointer; }
 .one-way-button.active { border-color:var(--navy); background:var(--navy); color:white; }
 .hidden { display:none !important; }
 .priority-row { margin-top:18px; }
-.transport-panel { display:flex; align-items:center; justify-content:space-between; gap:18px; margin-top:18px; padding:13px 16px; border:1px solid var(--line); border-radius:14px; background:var(--panel-2); }
+.transport-panel { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; gap:10px 18px; margin-top:18px; padding:13px 16px; border:1px solid var(--line); border-radius:14px; background:var(--panel-2); }
 .transport-panel > div:first-child { display:flex; flex-direction:column; gap:3px; }
 .transport-panel span { color:var(--muted); font-size:16px; }
-.transport-choices { display:flex; gap:18px; flex-wrap:wrap; }
-.split-ticket-choice { padding-left:18px; border-left:1px solid var(--line); }
+.transport-choices { display:flex; gap:10px; flex-wrap:wrap; }
+.transport-choice { position:relative; display:flex; align-items:center; gap:8px; min-height:44px; padding:8px 13px; border:1px solid var(--line); border-radius:11px; background:var(--panel); font-weight:800; cursor:pointer; }
+.transport-choice:has(input:checked) { border-color:var(--accent); box-shadow:inset 0 0 0 1px var(--accent); background:#fff8e7; }
+.transport-choice input { accent-color:var(--accent); width:17px; height:17px; }
+.split-ticket-choice { grid-column:2; min-height:auto; justify-self:start; }
+.split-ticket-choice.disabled { opacity:.55; }
 .ticket-toggle { display:flex; justify-content:space-between; align-items:center; gap:16px; padding:15px 16px; border:1px solid rgba(240,196,25,.28); background:linear-gradient(90deg, rgba(240,196,25,.08), rgba(240,196,25,.02)); border-radius:14px; }
 .ticket-toggle > div:first-child { display:flex; flex-direction:column; gap:4px; }
 .ticket-toggle strong { font-size:16px; }
@@ -258,9 +262,9 @@ body {
   .coverage-heading { align-items:flex-start; flex-direction:column; gap:2px; }
   .coverage-panel { padding:12px; }
   .coverage-content { grid-template-columns:1fr 1fr; gap:7px 10px; }
-  .transport-panel { align-items:flex-start; flex-direction:column; }
+  .transport-panel { grid-template-columns:1fr; align-items:flex-start; }
   .transport-choices { gap:10px 16px; }
-  .split-ticket-choice { flex-basis:100%; padding-left:0; border-left:0; }
+  .split-ticket-choice { grid-column:1; }
 }
 .direction-count { color: var(--muted); font-size: 16px; font-weight: 800; }
 .connection-list { display: grid; gap: 12px; }

@@ -18,7 +18,7 @@ let activeSearch = null;
 let coverageQueue = [];
 let coverageGeneration = 0;
 let activeCalendarSearch = null;
-const progressLabels = {db:'Deutsche Bahn', transitous:'Transitous', gtfs:'Flix-Fahrplan', flixbus:'FlixBus', flixtrain:'FlixTrain', merge:'Ergebnisaufbereitung'};
+const progressLabels = {db:'Bahnverbindungen', transitous:'Weitere Verbindungen', gtfs:'Fernbus- und Zugfahrplan', flixbus:'Busverbindungen', flixtrain:'Zusätzliche Zugverbindungen', merge:'Ergebnisaufbereitung'};
 const statusLabels = {waiting:'wartet', loading:'wird geladen', processing:'wird verarbeitet', completed:'abgeschlossen', empty:'keine Ergebnisse', failed:'fehlgeschlagen', cancelled:'abgebrochen'};
 
 function renderProgress(data={}) {
@@ -277,11 +277,13 @@ function getPayload() {
     deutschlandticket: state.travelMode !== 'flight_stay' && state.dticket,
     include_feeder: state.travelMode === 'flight',
     deutschlandticket_only: state.travelMode === 'ground' && state.dticket && document.getElementById('dticketOnly').checked,
-    include_flixtrain: state.travelMode !== 'flight_stay' && $('includeFlixtrain').checked,
-    include_flixbus: state.travelMode !== 'flight_stay' && $('includeFlixbus').checked,
+    include_train: state.travelMode !== 'flight_stay' && $('includeTrain').checked,
+    include_bus: state.travelMode !== 'flight_stay' && $('includeBus').checked,
+    include_flixtrain: state.travelMode !== 'flight_stay' && $('includeTrain').checked,
+    include_flixbus: state.travelMode !== 'flight_stay' && $('includeBus').checked,
     flix_origin_stop_id: null,
     flix_destination_stop_id: null,
-    split_ticket_check: state.travelMode !== 'flight_stay' && $('splitTicket').checked,
+    split_ticket_check: state.travelMode !== 'flight_stay' && $('includeTrain').checked && $('splitTicket').checked,
     include_destination_transfer: state.travelMode !== 'ground' && $('destinationTransfer').checked,
     origin_airports: originAirports,
     destination_airport: $('destinationAirport').value.trim().toUpperCase() || null,
@@ -482,8 +484,9 @@ async function loadCoverage() {
 function groundConnectionsHtml(title, component) {
   const connections = component?.connections || [];
   if (!connections.length) {
-    const statuses = (component?.provider_statuses || []).map(item => `<li><strong>${esc(item.provider)}</strong><span>${esc(item.provider === 'Flix' && item.outcome === 'no_connection' ? 'Keine Flix-Verbindung verfügbar' : item.message)}</span></li>`).join('');
-    return `<section class="direction-group" data-direction="${esc(title)}"><div class="direction-heading"><div><span class="eyebrow">Bahn & Bus</span><h2>${esc(title)}</h2></div><span class="muted">0 Verbindungen</span></div><article class="result-card"><p class="muted">Keine automatisch auswertbare Verbindung gefunden.</p>${statuses ? `<ul class="provider-statuses">${statuses}</ul>` : ''}</article></section>`;
+    const technicalFailure = (component?.provider_statuses || []).some(item => item.outcome === 'technical_error');
+    const message = technicalFailure ? 'Ein Teil der Verbindungen konnte technisch nicht geprüft werden.' : 'Keine Verbindung verfügbar.';
+    return `<section class="direction-group" data-direction="${esc(title)}"><div class="direction-heading"><div><span class="eyebrow">Bahn & Bus</span><h2>${esc(title)}</h2></div><span class="muted">0 Verbindungen</span></div><article class="result-card"><p class="muted">${message}</p></article></section>`;
   }
   const cards = connections.map(connection => {
     const coverageId = `coverage-${coverageGeneration}-${coverageQueue.length}`;
@@ -611,6 +614,11 @@ function bind() {
     state.travelMode = btn.dataset.mode;
     document.querySelectorAll('[data-mode]').forEach(x => x.classList.toggle('active', x===btn));
     syncTravelMode();
+  }));
+  ['includeTrain', 'includeBus'].forEach(id => $(id).addEventListener('change', () => {
+    if (!$('includeTrain').checked && !$('includeBus').checked) $(id).checked = true;
+    $('splitTicket').disabled = !$('includeTrain').checked;
+    $('splitTicket').closest('.split-ticket-choice').classList.toggle('disabled', !$('includeTrain').checked);
   }));
   document.querySelectorAll('[data-dticket]').forEach(btn => btn.addEventListener('click', () => {
     state.dticket = btn.dataset.dticket === 'true';

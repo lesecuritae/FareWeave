@@ -34,6 +34,8 @@ async def _compute(request: TripRequest) -> dict[str, Any]:
                 preference="cheapest" if request.effective_feeder_preference == "dticket_first" else request.effective_feeder_preference,
                 include_flixtrain=request.include_flixtrain,
                 include_flixbus=request.include_flixbus,
+                include_train=request.include_train,
+                include_bus=request.include_bus,
                 max_transfers=None,
                 max_results=request.max_results,
                 split_ticket_check=request.split_ticket_check,

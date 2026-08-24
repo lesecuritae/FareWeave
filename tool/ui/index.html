@@ -79,12 +79,12 @@
         </div>
 
         <section class="transport-panel feeder-option" aria-labelledby="transportTitle">
-          <div><strong id="transportTitle">Zug &amp; Bus</strong><span>Provider direkt auswählen; passende Haltestellen werden automatisch zugeordnet.</span></div>
+          <div><strong id="transportTitle">Wie möchtest du reisen?</strong><span>FareWeave sucht automatisch bei den passenden Anbietern.</span></div>
           <div class="transport-choices">
-            <label class="check"><input id="includeFlixtrain" type="checkbox" checked> FlixTrain</label>
-            <label class="check"><input id="includeFlixbus" type="checkbox" checked> FlixBus</label>
-            <label class="check split-ticket-choice"><input id="splitTicket" type="checkbox" checked> Split-Ticket-Suche</label>
+            <label class="transport-choice"><input id="includeTrain" type="checkbox" checked><span aria-hidden="true">🚆</span> Zug</label>
+            <label class="transport-choice"><input id="includeBus" type="checkbox" checked><span aria-hidden="true">🚌</span> Bus</label>
           </div>
+          <label class="check split-ticket-choice"><input id="splitTicket" type="checkbox" checked> Split-Ticket prüfen</label>
         </section>
 
         <div class="priority-row" id="ticketPanel">
@@ -127,9 +127,14 @@
           <p class="lodging-help" id="lodgingHelp">Hotel ist voreingestellt und beginnt bei 3 Sternen. Hostels erscheinen nur im eigenen Hostel-Reiter.</p>
         </section>
 
+        <div class="submit-row">
+          <button class="search-button" type="submit" id="searchButton">Verbindungen finden</button>
+        </div>
+
         <details class="advanced">
-          <summary>Weitere Optionen</summary>
+          <summary>Technische Einstellungen</summary>
           <div class="advanced-grid">
+            <label class="refresh"><input id="refreshCache" type="checkbox"> Live-Daten neu laden</label>
             <label class="check flight-option"><input id="destinationTransfer" type="checkbox" checked> Flughafen-Transfer</label>
             <label class="field flight-option">
               <span>Abflughafen IATA optional</span>
@@ -158,11 +163,6 @@
             </label>
           </div>
         </details>
-
-        <div class="submit-row">
-          <button class="search-button" type="submit" id="searchButton">Verbindungen finden</button>
-          <label class="refresh"><input id="refreshCache" type="checkbox"> Live-Daten neu laden</label>
-        </div>
       </form>
     </section>
 

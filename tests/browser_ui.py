@@ -61,6 +61,12 @@ async def check_viewport(browser, width: int, height: int) -> None:
     await page.locator("#splitTicket").uncheck()
     assert not await page.locator("#splitTicket").is_checked()
     await page.locator("#splitTicket").check()
+    assert await page.locator("#includeTrain").is_checked()
+    assert await page.locator("#includeBus").is_checked()
+    await page.locator("#includeTrain").uncheck()
+    assert await page.locator("#splitTicket").is_disabled()
+    await page.locator("#includeTrain").check()
+    assert await page.locator("#splitTicket").is_enabled()
     await page.locator("#origin").fill("München")
     await page.locator("#originSuggestions").wait_for(state="visible", timeout=30_000)
     assert await page.locator("#origin").get_attribute("data-selected") is None

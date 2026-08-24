@@ -111,5 +111,11 @@ def test_compare_queries_all_ground_providers_with_floor_and_keeps_le(monkeypatc
 
 def test_provider_states_distinguish_empty_and_failure():
     assert compare._provider_state("Flix", ok=True)["outcome"] == "no_connection"
-    assert compare._provider_state("Flix", ok=False)["message"] == "Technischer Abruffehler"
+    assert compare._provider_state("Flix", ok=False)["message"] == "Flix konnte nicht geprüft werden"
     assert compare._provider_state("DB", ok=True, result_count=1)["outcome"] == "connection_found"
+    train = {"type":"train", "line":"ICE 100"}
+    bus = {"type":"bus", "line":"Bus 100"}
+    train_only = ReiseRequest(origin="Leipzig", destination="Dortmund", travel_date=DATE, include_train=True, include_bus=False)
+    bus_only = ReiseRequest(origin="Leipzig", destination="Dortmund", travel_date=DATE, include_train=False, include_bus=True)
+    assert compare._transport_selected(train, train_only) and not compare._transport_selected(bus, train_only)
+    assert compare._transport_selected(bus, bus_only) and not compare._transport_selected(train, bus_only)

@@ -62,6 +62,8 @@ class ReiseRequest(BaseModel):
     travel_date: str = Field(description="Reisedatum YYYY-MM-DD; kein Datum in der Vergangenheit verwenden")
     departure_after: str = Field(default="06:00", description="Früheste Abfahrt HH:MM")
     preference: Literal["balanced", "cheapest", "fastest", "fewest_transfers"] = "balanced"
+    include_train: bool = True
+    include_bus: bool = True
     include_flixtrain: bool = True
     include_flixbus: bool = True
     max_transfers: int | None = Field(default=None, ge=0, le=8)
@@ -107,6 +109,8 @@ class ReiseRequest(BaseModel):
 
     @model_validator(mode="after")
     def different_stations(self):
+        if not self.include_train and not self.include_bus:
+            raise ValueError("Mindestens Zug oder Bus muss ausgewählt sein")
         if self.origin.casefold() == self.destination.casefold():
             raise ValueError("Start und Ziel müssen verschieden sein")
         if self.origin_station and self.origin.casefold() != self.origin_station.name.casefold():
@@ -248,6 +252,8 @@ class TripRequest(BaseModel):
         description="Nur vollständig vom vorhandenen Deutschlandticket abgedeckte Bodenverbindungen zulassen.",
     )
     include_feeder: bool = True
+    include_train: bool = True
+    include_bus: bool = True
     include_flixtrain: bool = True
     include_flixbus: bool = True
     split_ticket_check: bool = True
@@ -341,6 +347,8 @@ class TripRequest(BaseModel):
 
     @model_validator(mode="after")
     def validate_trip(self):
+        if self.travel_mode == "ground" and not self.include_train and not self.include_bus:
+            raise ValueError("Mindestens Zug oder Bus muss ausgewählt sein")
         if self.travel_mode == "ground" and bool(self.origin_station) != bool(self.destination_station):
             raise ValueError("Start- und Zielstation müssen gemeinsam ausgewählt werden")
         if self.origin_station and self.origin.casefold() != self.origin_station.name.casefold():
