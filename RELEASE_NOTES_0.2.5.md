@@ -10,6 +10,7 @@ FareWeave 0.2.5 entfernt feste Stationszuweisungen aus der Ortsauflösung und ma
 - Hauptbahnhöfe und bedeutende Fernverkehrshalte stehen weiter oben, ohne automatisch ausgewählt zu werden.
 - Flughafenhalte werden bei normalen Städteingaben ausgeblendet und nur bei passendem Flughafenbegriff berücksichtigt.
 - Provider-native IDs für DB, Transitous und Flix bleiben nach der ausdrücklichen Nutzerauswahl erhalten.
+- Geklammerte Providerzusätze wie „(bus station)“ beeinflussen die Flix-Stadtsuche nicht, während die konkrete Stations-ID erhalten bleibt.
 
 ## Reiseformular
 

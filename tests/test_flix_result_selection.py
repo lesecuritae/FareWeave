@@ -53,6 +53,7 @@ def test_flix_city_query() -> None:
     assert trvl._flix_city_query("Görlitz Hauptbahnhof") == "Görlitz"
     assert trvl._flix_city_query("Frankfurt(Main) Hbf") == "Frankfurt"
     assert trvl._flix_city_query("Dortmund Central Station (FlixTrain)") == "Dortmund"
+    assert trvl._flix_city_query("Görlitz (bus station)") == "Görlitz"
     assert trvl._flix_city_query("Leipzig Messe") == "Leipzig Messe"
     assert trvl._flix_transfer_requirement(
         {"station": "Görlitz", "station_id": "goerlitz-flix"},

@@ -194,7 +194,7 @@ def _flix_city_query(value: str) -> str:
     departure and arrival stops.
     """
     text = str(value or "").strip()
-    text = re.sub(r"\s*\(FlixTrain\)\s*$", "", text, flags=re.IGNORECASE).strip()
+    text = re.sub(r"\s*\((?:FlixTrain|bus\s+station|busbahnhof)\)\s*$", "", text, flags=re.IGNORECASE).strip()
     normalized = re.sub(
         r"(?:\s*\([^)]*\))?\s+(?:hbf|hauptbahnhof|central\s+(?:train\s+)?station|zob|busbahnhof)\s*$",
         "",

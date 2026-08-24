@@ -6,6 +6,7 @@
 - Haupt- und Fernverkehrsstationen werden anhand allgemeiner Stationsmerkmale und Provider-Verkehrsarten priorisiert. Flughäfen erscheinen nur bei erkennbarem Flughafen-Kontext.
 - „Nur Hinfahrt“ deaktiviert und dimmt Rückreisedatum sowie Kalenderbutton. Beim Zurückschalten wird eine gültige positive Reisedauer wiederhergestellt; Einweg-Payloads senden stets Dauer `0`.
 - Die Split-Ticket-Suche ist als kleiner, direkt sichtbarer Haken im Reiseformular aktivierbar und nicht mehr unter „Weitere Optionen“ versteckt.
+- Providerbezeichnungen mit geklammerten Busstationszusätzen werden für Flix als Ortsabfrage normalisiert; die ausgewählte native Stations-ID bleibt unverändert erhalten.
 
 ## 0.2.3 - 2026-08-24
 

@@ -12,7 +12,7 @@ from .gtfs_flix import discover_stops
 from .location_resolver import exact_location_key, has_airport_context, location_candidates, location_key
 
 _CACHE_TTL = 300
-_RANKING_GENERATION = "stations-v8"
+_RANKING_GENERATION = "stations-v9"
 
 
 def _base_station_query(value: str) -> str:
@@ -46,7 +46,7 @@ def _station_role_score(name: str, item: dict[str, Any] | None = None) -> int:
     if modes & {"HIGHSPEED_RAIL", "LONG_DISTANCE", "NIGHT_RAIL"}:
         score += 260
     elif "REGIONAL_RAIL" in modes:
-        score += 90
+        score += 180
     if "COACH" in modes:
         score += 120
     if item.get("parent_station"):
