@@ -6,6 +6,7 @@
 - Coverage erhält bestätigte Start-/Zielkoordinaten unabhängig vom Provider und bevorzugt vollständige Segment-/Stopover-Geometrien gegenüber unvollständigen Anzeige-Legs.
 - DB-, Transitous-, FlixTrain-, FlixBus- und Mischketten verwenden denselben providerneutralen Coverage-Datenfluss.
 - Fehlende Abdeckungsdaten melden „Mobilfunkdaten für diese Strecke nicht verfügbar“; technische Analyzerfehler melden getrennt „Mobilfunkanalyse fehlgeschlagen“.
+- Die Ergebnis-Cachegeneration wurde erhöht, damit ältere Routen ohne providerneutrale Coverage-Endpunkte nicht in 0.2.7 weiterverwendet werden.
 
 ## 0.2.6 - 2026-08-24
 

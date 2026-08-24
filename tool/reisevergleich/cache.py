@@ -11,7 +11,7 @@ import uuid
 from pathlib import Path
 from typing import Any, Awaitable, Callable
 
-CACHE_SCHEMA = 4
+CACHE_SCHEMA = 5
 DEFAULT_DB = "/var/lib/reisevergleich/cache.sqlite3"
 _stats_var: contextvars.ContextVar[dict[str, int] | None] = contextvars.ContextVar("reise_cache_stats", default=None)
 _refresh_var: contextvars.ContextVar[bool] = contextvars.ContextVar("reise_cache_refresh", default=False)

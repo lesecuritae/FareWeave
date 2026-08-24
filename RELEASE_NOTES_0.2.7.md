@@ -14,6 +14,7 @@ FareWeave 0.2.7 stabilisiert Segmentdarstellung und Mobilfunkanalyse, ohne Provi
 - Bestätigte Start- und Zielkoordinaten werden providerneutral an die Verbindung übergeben.
 - Vorhandene Geometrie, Stopovers und vollständige Segmente werden unabhängig von sichtbaren Provider- oder Liniennamen ausgewertet.
 - Fehlende Daten und technische Analyzerfehler sind getrennte Zustände.
+- Ältere Ergebnis-Caches ohne Coverage-Endpunkte werden über eine neue Schema-Generation sicher ignoriert.
 - Die bestehenden BNetzA- und OpenCellID-Datenquellen bleiben unverändert.
 
 ## Qualität
