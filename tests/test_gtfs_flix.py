@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import csv
+import asyncio
 import os
 import tempfile
 import zipfile
@@ -14,6 +15,7 @@ from reisevergleich.gtfs_flix import (
     _build_database, _search_sync, enrich_live_prices, gtfs_local_datetime,
     gtfs_seconds, service_active, stop_score,
 )
+import reisevergleich.gtfs_flix as gtfs_flix
 
 
 assert gtfs_seconds("24:15:00") == 87300
@@ -117,6 +119,30 @@ assert enriched["provider_status"]["live_pricing"]["matched_prices"] == 1
 ambiguous = {**live, "candidate_routes": live["candidate_routes"] * 2}
 schedule["candidate_routes"][0]["price"] = None
 assert enrich_live_prices(schedule, ambiguous)["candidate_routes"][0]["price"] is None
+
+
+async def fresh_feed_does_not_wait_for_refresh_lock():
+    """A second search must not block behind a long-running GTFS refresh."""
+    with tempfile.TemporaryDirectory() as temporary:
+        database = Path(temporary) / "flix.sqlite3"
+        database.touch()
+        old_directory = gtfs_flix.FLIX_GTFS_DIR
+        old_max_age = gtfs_flix.FLIX_GTFS_MAX_AGE
+        gtfs_flix.FLIX_GTFS_DIR = temporary
+        gtfs_flix.FLIX_GTFS_MAX_AGE = 3600
+        try:
+            await gtfs_flix._lock.acquire()
+            try:
+                resolved = await asyncio.wait_for(gtfs_flix.ensure_feed(), timeout=0.1)
+            finally:
+                gtfs_flix._lock.release()
+            assert resolved == database
+        finally:
+            gtfs_flix.FLIX_GTFS_DIR = old_directory
+            gtfs_flix.FLIX_GTFS_MAX_AGE = old_max_age
+
+
+asyncio.run(fresh_feed_does_not_wait_for_refresh_lock())
 
 for service_day, gtfs_time, live_time in (
     (date(2026, 8, 24), "09:04:00", "2026-08-24T11:04:00+02:00"),

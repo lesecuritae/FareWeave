@@ -9,7 +9,9 @@ RUN git init db-vendo-client \
     && git remote add origin https://github.com/public-transport/db-vendo-client.git \
     && git fetch --depth 1 origin "${DB_VENDO_COMMIT}" \
     && git checkout --detach FETCH_HEAD \
-    && npm ci --omit=dev --ignore-scripts
+    && npm ci --omit=dev --ignore-scripts \
+    && npm install --omit=dev --ignore-scripts --no-save --package-lock=false qs@6.15.3 uuid@11.1.1 \
+    && npm audit --omit=dev --audit-level=high
 
 FROM node:24-bookworm-slim
 ENV NODE_ENV=production

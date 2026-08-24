@@ -42,7 +42,7 @@ assert 'HISTORY_SNAPSHOT_SCHEDULER_ENABLED: "${HISTORY_SNAPSHOT_SCHEDULER_ENABLE
 assert 'HISTORY_SNAPSHOT_INTERVAL_SECONDS: "${HISTORY_SNAPSHOT_INTERVAL_SECONDS:-86400}"' in compose
 assert "HEALTHCHECK" in app_dockerfile and "/api/health" in app_dockerfile
 assert "HEALTHCHECK" in db_api_dockerfile and "/health" in db_api_dockerfile
-assert "fareweave/0.0.4" in db_api_server and "fareweave/0.0.3" not in db_api_server
+assert "fareweave/0.0.5" in db_api_server and "fareweave/0.0.4" not in db_api_server
 assert 'name = "fareweave"' in pyproject and 'testpaths = ["tests"]' in pyproject
 test_requirements = (root / "tool" / "requirements-test.txt").read_text(encoding="utf-8")
 assert "-r requirements.txt" in test_requirements

@@ -7,6 +7,7 @@ import os
 import re
 import tempfile
 import threading
+from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
@@ -35,6 +36,9 @@ _active: set[str] = set()
 _reading: set[str] = set()
 _guard = threading.Lock()
 _remote_fill_limiter = threading.BoundedSemaphore(max(1, HISTORY_MAX_CONCURRENCY))
+_history_executor = ThreadPoolExecutor(
+    max_workers=max(1, HISTORY_MAX_CONCURRENCY), thread_name_prefix="fareweave-history",
+)
 _snapshot_locks: dict[str, threading.Lock] = {}
 _snapshot_locks_guard = threading.Lock()
 _SNAPSHOT_SCHEMA = 1
@@ -270,7 +274,7 @@ def _download_month(url: str, directory: Path) -> Path:
     try:
         response = curl_requests.get(
             url,
-            headers={"User-Agent": "FareWeave/0.0.4"},
+            headers={"User-Agent": "FareWeave/0.0.5"},
             impersonate="firefox",
             timeout=HISTORY_REMOTE_TIMEOUT,
             allow_redirects=True,
@@ -393,7 +397,12 @@ async def ensure_detail_cache(spec: DetailSpec) -> Path:
                 if valid:
                     return target
             target.unlink(missing_ok=True)
-            return await asyncio.to_thread(_write_detail, spec)
+            # Remote history reads may outlive a cancelled request. Keep them
+            # out of asyncio's shared executor so they cannot starve GTFS,
+            # cache, DB bridge, or later searches in the same process.
+            return await asyncio.get_running_loop().run_in_executor(
+                _history_executor, _write_detail, spec,
+            )
         finally:
             with _guard:
                 _active.discard(key)

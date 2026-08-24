@@ -4,7 +4,7 @@ import asyncio
 from datetime import date, datetime, timedelta
 from typing import Any
 
-from .config import today_iso
+from .config import HISTORY_ENRICH_TIMEOUT, today_iso
 from .db import build_manual_db_links, compact_attempts, compact_route, rank_routes
 from .ground_connections import connection_signature
 from .flix_connections import complete_flix_routes
@@ -16,6 +16,16 @@ from .utils import as_float, as_int, parse_datetime, route_departure_in_window
 from .progress import update as progress
 
 _route_departure_in_window = route_departure_in_window
+
+
+async def _enrich_history_bounded(routes: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Keep optional history I/O outside the critical search latency path."""
+    try:
+        return await asyncio.wait_for(
+            enrich_routes_history(routes), timeout=HISTORY_ENRICH_TIMEOUT,
+        )
+    except (Exception, asyncio.TimeoutError):
+        return routes
 
 def select_visible_ground_options(
     db_routes: list[dict[str, Any]],
@@ -158,10 +168,7 @@ async def compare_trip(request: ReiseRequest) -> dict[str, Any]:
 
     # Historie ist eine unabhängige, rein additive Schicht. Fehler oder Timeouts
     # dürfen Providerresultate, Preise und Ranking niemals verändern.
-    try:
-        db_routes = await enrich_routes_history(db_routes)
-    except Exception:
-        pass
+    db_routes = await _enrich_history_bounded(db_routes)
 
     selected_db = rank_routes(db_routes, request.preference)[0] if db_routes else None
     split: dict[str, Any] = {

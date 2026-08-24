@@ -8,6 +8,7 @@ __pycache__/
 .pytest_cache/
 .coverage
 htmlcov/
+backups/
 *.egg-info/
 *.log
 *.sqlite

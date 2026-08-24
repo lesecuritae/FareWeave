@@ -23,7 +23,7 @@ services:
     container_name: fareweave-db-api
     environment:
       PORT: "3001"
-      USER_AGENT: fareweave/0.0.4
+      USER_AGENT: fareweave/0.0.5
       DB_CFFI_BRIDGE_URL: http://app:8000/internal/db-cffi/request
       DB_CFFI_TOKEN: "${DB_CFFI_TOKEN:-}"
       DB_CFFI_TOKEN_FILE: /run/fareweave-secrets/db_cffi_token
@@ -69,6 +69,7 @@ services:
       HISTORY_CACHE_DIR: "${HISTORY_CACHE_DIR:-/var/lib/reisevergleich/history}"
       HISTORY_CACHE_MAX_GB: "${HISTORY_CACHE_MAX_GB:-5}"
       HISTORY_REMOTE_TIMEOUT: "${HISTORY_REMOTE_TIMEOUT:-60}"
+      HISTORY_ENRICH_TIMEOUT: "${HISTORY_ENRICH_TIMEOUT:-8}"
       HISTORY_MAX_CONCURRENCY: "${HISTORY_MAX_CONCURRENCY:-2}"
       HISTORY_STATS_TTL: "${HISTORY_STATS_TTL:-86400}"
       HISTORY_DEFAULT_WINDOW_DAYS: "${HISTORY_DEFAULT_WINDOW_DAYS:-90}"

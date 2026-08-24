@@ -1,4 +1,16 @@
 # Changelog
+## 0.0.5 - 2026-08-24
+
+- PR #5 wurde im vollständigen Planner-Pfad mit `max_results` 10, 24 und 48 validiert; Hotelanfragen bleiben auf das gültige Maximum 10 begrenzt und verursachen keine Pydantic-/HTTP-500-Fehler.
+- PR #6 wurde gegen den echten Flix-GTFS-Feed validiert: München/Munich, Köln/Cologne und Wien/Vienna lösen dieselben korrekten Haltestellen auf.
+- Frische GTFS-Daten werden lock-frei gelesen, während Refreshes weiterhin serialisiert und atomar installiert werden; parallele Suchen warten nicht mehr hinter einem unnötigen Feed-Lock.
+- Die rein additive Bahn-Historienanreicherung besitzt ein hartes Gesamtbudget und einen isolierten Threadpool. Langsame oder abgebrochene Historien-Downloads blockieren weder GTFS/Cache/DB noch nachfolgende Suchen.
+- Vier parallele reale Bodenreisen liefen in 22–31 Sekunden; unmittelbar folgende Suchen liefen in 21–23 Sekunden statt zuvor bis zu 131 Sekunden im gleichen Container.
+- FlixBus-/FlixTrain-Zeiten, Livepreise und HTTPS-Direktlinks sowie DB-Verbindungen wurden in den Strecken München, Köln und Wien nach Berlin geprüft.
+- Flug ohne Hotel und Flug mit realer Hotelanreicherung (`max_results=24`) liefen mit HTTP 200; eine fehlerhafte Stay22-Antwort blieb auf den Hotelprovider begrenzt.
+- `curl_cffi` wurde von 0.16.0 auf 0.16.1 aktualisiert. Die direkten `db-vendo-client`-Abhängigkeiten `qs` und `uuid` werden im Image sicherheitsbedingt auf 6.15.3 bzw. 11.1.1 angehoben.
+- TRVL `v1.21.4` wurde als weiterhin neuestes offizielles Release bestätigt und inklusive CLI-Verträge erneut gebaut und geprüft.
+
 ## 0.0.4 - 2026-08-21
 
 - FlixBus- und FlixTrain-Fahrpläne werden aus dem strukturierten europäischen Transitous-GTFS mit vollständiger `calendar.txt`-/`calendar_dates.txt`-Auswertung gelesen.

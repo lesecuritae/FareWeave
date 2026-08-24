@@ -12,10 +12,10 @@ def _env_bool(name: str, default: bool) -> bool:
     if value is None:
         return default
     return value.strip().lower() in {"1", "true", "yes", "on"}
-APP_VERSION = "0.0.4"
+APP_VERSION = "0.0.5"
 DB_API_URL = os.getenv("DB_API_URL", "http://db-api:3001").rstrip("/")
 TRANSITOUS_URL = os.getenv("TRANSITOUS_URL", "https://api.transitous.org").rstrip("/")
-TRANSITOUS_USER_AGENT = os.getenv("TRANSITOUS_USER_AGENT", "fareweave/0.0.4")
+TRANSITOUS_USER_AGENT = os.getenv("TRANSITOUS_USER_AGENT", "fareweave/0.0.5")
 TRVL_BIN = os.getenv("TRVL_BIN", "trvl")
 FLIX_GTFS_URL = os.getenv("FLIX_GTFS_URL", "https://api.transitous.org/gtfs/eu_flixbus.gtfs.zip")
 FLIX_GTFS_DIR = os.getenv("FLIX_GTFS_DIR", "/var/lib/reisevergleich/flix-gtfs")
@@ -42,6 +42,7 @@ HISTORY_ENABLED = _env_bool("HISTORY_ENABLED", True)
 HISTORY_CACHE_DIR = os.getenv("HISTORY_CACHE_DIR", "/var/lib/reisevergleich/history")
 HISTORY_CACHE_MAX_GB = min(max(float(os.getenv("HISTORY_CACHE_MAX_GB", "5")), 0.1), 100.0)
 HISTORY_REMOTE_TIMEOUT = min(max(float(os.getenv("HISTORY_REMOTE_TIMEOUT", "60")), 2.0), 120.0)
+HISTORY_ENRICH_TIMEOUT = min(max(float(os.getenv("HISTORY_ENRICH_TIMEOUT", "8")), 1.0), 20.0)
 HISTORY_MAX_CONCURRENCY = min(max(int(os.getenv("HISTORY_MAX_CONCURRENCY", "2")), 1), 4)
 HISTORY_STATS_TTL = min(max(int(os.getenv("HISTORY_STATS_TTL", "86400")), 300), 31_536_000)
 HISTORY_DEFAULT_WINDOW_DAYS = min(max(int(os.getenv("HISTORY_DEFAULT_WINDOW_DAYS", "90")), 7), 730)

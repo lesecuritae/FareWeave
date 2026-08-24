@@ -54,31 +54,35 @@ async def main():
         planner._flight_result_for_stay = fake_flight_result_for_stay
         planner.hotel_search = fake_hotel_search
 
-        request = TripRequest(
-            travel_mode="flight",
-            origin="Frankfurt (Main) Hbf",
-            destination="Paris",
-            departure_date="2030-09-15",
-            return_mode="duration",
-            duration_value=7,
-            duration_unit="nights",
-            deutschlandticket=True,
-            include_feeder=False,
-            origin_airports=["FRA"],
-            destination_airport="CDG",
-            include_hotel=True,
-            hotel_property_type="hotel",
-            hotel_min_stars=3,
-            include_destination_transfer=False,
-            max_results=3,
-            refresh_cache=True,
-        )
-        result = await planner.complete_trip(request)
+        results = []
+        for max_results in (10, 24, 48):
+            request = TripRequest(
+                travel_mode="flight",
+                origin="Frankfurt (Main) Hbf",
+                destination="Paris",
+                departure_date="2030-09-15",
+                return_mode="duration",
+                duration_value=7,
+                duration_unit="nights",
+                deutschlandticket=True,
+                include_feeder=False,
+                origin_airports=["FRA"],
+                destination_airport="CDG",
+                include_hotel=True,
+                hotel_property_type="hotel",
+                hotel_min_stars=3,
+                include_destination_transfer=False,
+                max_results=max_results,
+                refresh_cache=True,
+            )
+            results.append(await planner.complete_trip(request))
     finally:
         planner._flight_result_for_stay = original_flight
         planner.hotel_search = original_hotel
 
-    assert result["status"] == "ok", result
+    assert [request.max_results for request in hotel_requests] == [10, 10, 10]
+    result = results[-1]
+    assert all(item["status"] == "ok" for item in results), results
     assert result["recommended_origin_airport"] == "FRA", result
     candidate = result["airport_candidates"][0]
     summary = candidate["cost_summary"]

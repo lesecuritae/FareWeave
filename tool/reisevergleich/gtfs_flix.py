@@ -28,6 +28,22 @@ REQUIRED = {"agency.txt", "routes.txt", "trips.txt", "stops.txt", "stop_times.tx
 _lock = asyncio.Lock()
 
 
+def _fresh_database() -> Path | None:
+    """Return the current feed without waiting for an unrelated refresh.
+
+    Database refreshes are built in a temporary directory and installed with an
+    atomic replace.  Readers can therefore safely keep using a fresh database
+    while another request performs an explicit refresh.
+    """
+    database = Path(FLIX_GTFS_DIR) / "flix.sqlite3"
+    try:
+        if database.is_file() and time.time() - database.stat().st_mtime < FLIX_GTFS_MAX_AGE:
+            return database
+    except OSError:
+        return None
+    return None
+
+
 def gtfs_seconds(value: str) -> int:
     parts = value.strip().split(":")
     if len(parts) != 3:
@@ -221,6 +237,10 @@ def _refresh_sync(force: bool = False) -> Path:
 
 
 async def ensure_feed(force: bool = False) -> Path:
+    if not force:
+        database = _fresh_database()
+        if database is not None:
+            return database
     async with _lock:
         return await asyncio.to_thread(_refresh_sync, force)
 
