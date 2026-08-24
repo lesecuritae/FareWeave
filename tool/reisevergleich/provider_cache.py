@@ -55,8 +55,8 @@ async def flight_search(request):
 
 
 async def hotel_search(request):
-    # Live accommodation offers are intentionally not persisted. Stay22 permits
-    # instant consumer display but no hard/cold storage of its listings.
+    # Live accommodation offers are intentionally not persisted because prices
+    # and availability can change between search and provider checkout.
     return await raw_trvl.hotel_search(request)
 
 

@@ -23,7 +23,7 @@ services:
     container_name: fareweave-db-api
     environment:
       PORT: "3001"
-      USER_AGENT: fareweave/0.0.5
+      USER_AGENT: fareweave/0.0.6
       DB_CFFI_BRIDGE_URL: http://app:8000/internal/db-cffi/request
       DB_CFFI_TOKEN: "${DB_CFFI_TOKEN:-}"
       DB_CFFI_TOKEN_FILE: /run/fareweave-secrets/db_cffi_token
@@ -63,7 +63,6 @@ services:
       DB_API_URL: http://db-api:3001
       DB_CFFI_TOKEN: "${DB_CFFI_TOKEN:-}"
       DB_CFFI_TOKEN_FILE: /run/fareweave-secrets/db_cffi_token
-      STAY22_API_KEY: ${STAY22_API_KEY:-}
       REISE_CACHE_DB: /var/lib/reisevergleich/cache.sqlite3
       HISTORY_ENABLED: "${HISTORY_ENABLED:-true}"
       HISTORY_CACHE_DIR: "${HISTORY_CACHE_DIR:-/var/lib/reisevergleich/history}"
@@ -81,7 +80,6 @@ services:
       FLIGHT_PROVIDER_CONCURRENCY: "3"
       HOTEL_ENRICH_TIMEOUT: "35"
       HOTEL_HEADLINE_TIMEOUT: "20"
-      HOTEL_STAY22_TIMEOUT: "15"
       # trvl wartet sonst intern bis 18 s je Hotelprovider. Das lässt dem
       # äußeren 20-s-Headline-Fallback keine Zeit zum Mergen/Serialisieren.
       TRVL_PROVIDER_TIMEOUT: "8s"

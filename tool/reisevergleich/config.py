@@ -12,10 +12,10 @@ def _env_bool(name: str, default: bool) -> bool:
     if value is None:
         return default
     return value.strip().lower() in {"1", "true", "yes", "on"}
-APP_VERSION = "0.0.5"
+APP_VERSION = "0.0.6"
 DB_API_URL = os.getenv("DB_API_URL", "http://db-api:3001").rstrip("/")
 TRANSITOUS_URL = os.getenv("TRANSITOUS_URL", "https://api.transitous.org").rstrip("/")
-TRANSITOUS_USER_AGENT = os.getenv("TRANSITOUS_USER_AGENT", "fareweave/0.0.5")
+TRANSITOUS_USER_AGENT = os.getenv("TRANSITOUS_USER_AGENT", "fareweave/0.0.6")
 TRVL_BIN = os.getenv("TRVL_BIN", "trvl")
 FLIX_GTFS_URL = os.getenv("FLIX_GTFS_URL", "https://api.transitous.org/gtfs/eu_flixbus.gtfs.zip")
 FLIX_GTFS_DIR = os.getenv("FLIX_GTFS_DIR", "/var/lib/reisevergleich/flix-gtfs")
@@ -29,7 +29,6 @@ FLIGHT_PROVIDER_TIMEOUT = min(max(int(os.getenv("FLIGHT_PROVIDER_TIMEOUT", "25")
 FLIGHT_PROVIDER_CONCURRENCY = min(max(int(os.getenv("FLIGHT_PROVIDER_CONCURRENCY", "3")), 1), 4)
 HOTEL_ENRICH_TIMEOUT = min(max(int(os.getenv("HOTEL_ENRICH_TIMEOUT", "35")), 15), 55)
 HOTEL_HEADLINE_TIMEOUT = min(max(int(os.getenv("HOTEL_HEADLINE_TIMEOUT", "20")), 8), 35)
-HOTEL_STAY22_TIMEOUT = min(max(int(os.getenv("HOTEL_STAY22_TIMEOUT", "15")), 6), 25)
 GROUND_PROVIDER_TIMEOUT = min(max(int(os.getenv("GROUND_PROVIDER_TIMEOUT", "22")), 8), 40)
 GROUND_PROVIDER_CONCURRENCY = min(max(int(os.getenv("GROUND_PROVIDER_CONCURRENCY", "2")), 1), 3)
 TRANSFER_PROVIDER_TIMEOUT = min(max(int(os.getenv("TRANSFER_PROVIDER_TIMEOUT", "20")), 8), 35)

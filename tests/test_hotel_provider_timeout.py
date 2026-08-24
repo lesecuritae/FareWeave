@@ -18,7 +18,6 @@ assert env_value("TRVL_PROVIDER_TIMEOUT") == "8s", (
     "Headline-Limit liegen, damit blockierte Provider schnelle Hotelquellen nicht verdrängen."
 )
 assert int(env_value("HOTEL_HEADLINE_TIMEOUT")) == 20
-assert int(env_value("HOTEL_STAY22_TIMEOUT")) == 15
 assert int(env_value("HOTEL_ENRICH_TIMEOUT")) == 35
 
 assert _cacheable_component({"status": "manual_required"}) is False

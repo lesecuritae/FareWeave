@@ -19,7 +19,6 @@ from .config import (
 )
 from .models import FlightRequest, HotelRequest, ReiseRequest
 from .db import rank_routes
-from .hotel_stay22 import search_stay22_sync
 from .airports import AIRPORT_TRANSIT_QUERIES, CITY_TRANSIT_QUERIES
 from .transitous import search as transitous_direct_search
 from .utils import (
@@ -792,37 +791,6 @@ def _hotel_rank(item: dict[str, Any]) -> tuple[int, float, float]:
     )
 
 
-def _select_hotel_options(
-    primary: list[dict[str, Any]],
-    independent: list[dict[str, Any]],
-    max_results: int,
-) -> list[dict[str, Any]]:
-    combined: list[dict[str, Any]] = []
-    known: set[tuple[str, str, str]] = set()
-    for item in [*primary, *independent]:
-        key = (
-            str(item.get("name") or "").casefold().strip(),
-            str(item.get("address") or "").casefold().strip(),
-            str(item.get("provider") or "").casefold().strip(),
-        )
-        if key in known:
-            continue
-        known.add(key)
-        combined.append(item)
-    combined.sort(key=_hotel_rank)
-    selected = combined[:max_results]
-
-    independent_ranked = sorted(independent, key=_hotel_rank)
-    has_independent = any(str(item.get("provider") or "").startswith("stay22:") for item in selected)
-    if independent_ranked and not has_independent:
-        if selected:
-            selected[-1] = independent_ranked[0]
-        else:
-            selected.append(independent_ranked[0])
-        selected.sort(key=_hotel_rank)
-    return selected
-
-
 async def hotel_search(request: HotelRequest) -> dict[str, Any]:
     base = [
         TRVL_BIN,
@@ -848,10 +816,7 @@ async def hotel_search(request: HotelRequest) -> dict[str, Any]:
 
     # Zuerst die vollständige Suche mit Zimmerpreisen. Sie hat ein hartes Limit.
     started = time.monotonic()
-    enriched, stay22 = await asyncio.gather(
-        asyncio.to_thread(run_json_command, base, HOTEL_ENRICH_TIMEOUT),
-        asyncio.to_thread(search_stay22_sync, request),
-    )
+    enriched = await asyncio.to_thread(run_json_command, base, HOTEL_ENRICH_TIMEOUT)
     elapsed = time.monotonic() - started
     enriched_raw = compact_hotel_options(
         enriched.get("data") if enriched.get("ok") else None,
@@ -863,13 +828,7 @@ async def hotel_search(request: HotelRequest) -> dict[str, Any]:
     ], request.property_type)
     attempts.append(_command_status("trvl_hotels_enriched", enriched, elapsed, len(enriched_options)))
 
-    stay22_options = stay22.get("options") if isinstance(stay22, dict) else []
-    stay22_options = [item for item in stay22_options if isinstance(item, dict)]
-    stay22_status = stay22.get("status") if isinstance(stay22, dict) else None
-    if isinstance(stay22_status, dict):
-        attempts.append(stay22_status)
-
-    options = _select_hotel_options(enriched_options, stay22_options, request.max_results)
+    options = enriched_options[: request.max_results]
     has_verified = any(as_float(item.get("verified_total_price")) > 0 for item in options)
 
     # Wenn die Zimmeranreicherung hängt oder keine passenden Ergebnisse liefert,

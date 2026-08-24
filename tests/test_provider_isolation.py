@@ -101,9 +101,7 @@ def fake_flix_routes(command: list[str], timeout: int):
 
 async def main():
     original = trvl.run_json_command
-    original_stay22 = trvl.search_stay22_sync
     trvl.run_json_command = fake_run_json
-    trvl.search_stay22_sync = lambda request: {"options": [], "status": {"provider": "stay22_expedia_hotelscom", "ok": True, "timed_out": False, "result_count": 0, "elapsed_ms": 1}}
     try:
         flight = await trvl.flight_search(FlightRequest(
             origin_iata="AAA", destination_iata="BBB", departure_date=future, return_date=ret, max_results=3,
@@ -147,7 +145,6 @@ async def main():
         assert flix["routes"][0]["arrival"]["city"] == "Cologne", flix
     finally:
         trvl.run_json_command = original
-        trvl.search_stay22_sync = original_stay22
 
     print("Provider-Isolation und harte Einzel-Timeouts: OK")
 

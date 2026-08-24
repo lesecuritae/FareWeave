@@ -8,7 +8,7 @@
 
 Rail, the Deutschlandticket, split tickets, FlixTrain, FlixBus, flights, airport feeders, transfers, and accommodation are combined into a single itinerary. FareWeave does not merely look for a low price somewhere. Every part of the journey must fit together both chronologically and logically.
 
-Current version: **0.0.5**
+Current version: **0.0.6**
 
 FareWeave does not sell or book anything itself. If a provider supplies a usable offer link, it can be opened directly from the result. Where no direct link is available, FareWeave offers a suitable manual cross-check, for example with Deutsche Bahn, Google Flights, Google Hotels, or Google Maps. Price and availability must always be verified with the actual provider.
 
@@ -98,11 +98,11 @@ trvl supplies data in selected places. FareWeave then applies deterministic rule
 
 Flight providers are queried separately and have their own time limits. A slow or broken provider must not block the entire journey plan.
 
-FareWeave 0.0.5 first queries **Skiplagged, Ryanair, Vueling, and easyJet**. If those results are insufficient, it continues with **Transavia, Norwegian, Air France/KLM, and Wizz Air**.
+FareWeave 0.0.6 first queries **Skiplagged, Ryanair, Vueling, and easyJet**. If those results are insufficient, it continues with **Transavia, Norwegian, Air France/KLM, and Wizz Air**.
 
 The aggregated trvl request is not passed through without limits. FareWeave queries the required providers in isolation, combines usable results, and rejects chronologically implausible flights.
 
-Google Flights is also included as a manual cross-check. In FareWeave 0.0.5 it is **not a separate automated Google Flights provider**, but a suitable search link for the requested route and travel dates.
+Google Flights is also included as a manual cross-check. In FareWeave 0.0.6 it is **not a separate automated Google Flights provider**, but a suitable search link for the requested route and travel dates.
 
 ## Transfers and public transport
 
@@ -119,8 +119,6 @@ FareWeave can search for accommodation matching the journey. Check-in and check-
 The general accommodation search uses trvl. Depending on its sources, the hotel and room data may contain offers or providers such as **Booking.com, Expedia, Hotels.com, Agoda, Trip.com, Kayak, Trivago**, or direct hotel offers. FareWeave deliberately does not claim to query every one of these providers directly. It processes what the trvl hotel search actually returns.
 
 **Booking.com is technically supported by the underlying hotel search, but is currently not a reliable source in practice.** Its WAF and bot protection may block automated requests. Such a failure is treated as a provider issue and must not terminate the entire accommodation search or journey plan.
-
-Stay22 is also integrated separately into FareWeave. It currently supplies **Expedia and Hotels.com** as additional accommodation sources. An optional `STAY22_API_KEY` may be configured.
 
 Hotels, hostels, apartments, and resorts are distinct accommodation types. A normal hotel search starts at three stars by default. A hostel is not treated as a hotel merely because it has a star rating.
 
@@ -196,7 +194,7 @@ Browser UI -> FastAPI -> FareWeave orchestration
                          |-> Transitous
                          |-> FlixTrain / FlixBus
                          |-> isolated trvl flight providers
-                         |-> trvl hotels + Stay22
+                         |-> trvl hotels
                          `-> SQLite cache
 ```
 
@@ -281,8 +279,6 @@ The interface is available at <http://127.0.0.1:8791>.
 
 `DB_CFFI_TOKEN` is optional; FareWeave securely generates and persists an internal token by default. The token is only a locally generated internal secret between `fareweave-app` and `fareweave-db-api`. It is not a user password or FareWeave login.
 
-**`STAY22_API_KEY` is optional.** FareWeave installs and runs with the empty default `STAY22_API_KEY=`. Only hotel providers or features that actually require a Stay22 key may be unavailable or limited; the remaining travel-comparison features are not blocked.
-
 The published images are:
 
 ```text
@@ -357,7 +353,7 @@ docker compose build
 docker compose up -d
 ```
 
-trvl is pinned through `TRVL_REF`; FareWeave 0.0.5 uses `v1.21.4` by default.
+trvl is pinned through `TRVL_REF`; FareWeave 0.0.6 uses `v1.21.4` by default.
 
 ## Quality assurance
 
@@ -423,13 +419,10 @@ external services.
   – technical foundation of the DB backend.
 - [public-transport/transitous](https://github.com/public-transport/transitous) – public
   transport routing data and transfers.
-- [Stay22](https://www.stay22.com/) – additional accommodation search, currently limited
-  to Expedia and Hotels.com in FareWeave.
-
 Additional dependencies and their applicable licence terms are documented in
 [THIRD_PARTY.md](THIRD_PARTY.md).
 
-FareWeave is independent of Deutsche Bahn, BetterBahn, Flix, trvl, Transitous, Stay22,
+FareWeave is independent of Deutsche Bahn, BetterBahn, Flix, trvl, Transitous,
 and all other queried or linked travel providers. Their respective owners retain all
 trademarks and names.
 

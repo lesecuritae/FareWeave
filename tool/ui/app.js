@@ -284,7 +284,7 @@ function hotelCard(h) {
     const price = x.price || {};
     const basis = price.basis === 'verified_total_stay' ? 'Gesamtpreis verifiziert' : 'Preis vor Buchung prüfen';
     const classification = x.stars ? `${x.stars} Sterne` : (x.provider_min_stars ? `mindestens ${x.provider_min_stars} Sterne laut Providerfilter` : '');
-    const source = x.provider ? ` · Quelle: ${String(x.provider).replace('stay22:', '')} via Stay22` : '';
+    const source = x.provider ? ` · Quelle: ${String(x.provider)}` : '';
     return `<div class="hotel"><strong>${esc(x.name || 'Unterkunft')}</strong><div class="muted">${esc(classification)}${x.rating ? ` · ${x.rating}/10` : ''}${esc(source)}</div><div class="hotel-price">${price.value !== undefined ? money(price.value,price.currency) : 'Preis offen'}</div><div class="meta">${esc(basis)}</div>${actionLinks(x.offer_url, null)}</div>`;
   }).join('');
   return `<article class="result-card"><div class="card-head"><div><span class="eyebrow">Unterkunft</span><h3>${dateText(h.checkin)} – ${dateText(h.checkout)}</h3></div></div><div class="hotel-list">${html || '<p class="muted">Keine passende Unterkunft gefunden.</p>'}</div>${actionLinks(null, h.manual_url)}</article>`;

@@ -79,7 +79,7 @@ assert "isGround && option.classList.contains('flight-option')" in js
 assert "ticketPanel').classList.toggle('disabled'" not in js
 
 assert "provider_min_stars" in js
-assert "via Stay22" in js
+assert "Quelle:" in js
 
 for label in ["Angebot prüfen/buchen", "Weitere Angebote öffnen"]:
     assert label in js
