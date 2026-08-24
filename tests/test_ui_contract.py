@@ -80,7 +80,9 @@ for hidden_coverage_text in ["Mindestens 1 Netz", "Mindestens 2 Netze", "Mindest
     assert hidden_coverage_text not in js
 assert "Keine Flix-Verbindung verfügbar" in js
 assert "flix_origin_stop_id:" in js and "flix_destination_stop_id:" in js
-assert "Automatisch" in html and "/api/flix-stops" in js
+assert 'id="includeFlixtrain"' in html and 'id="includeFlixbus"' in html
+assert 'class="transport-panel feeder-option"' in html
+assert 'id="flixOriginStop"' not in html and "/api/flix-stops" not in js
 
 assert "class=\"lodging-panel hidden\"" in html
 assert "classList.toggle(\"hidden\", isGround || state.journeyType === 'one_way')" in js
@@ -91,7 +93,7 @@ assert html.count("flight-option") == 5
 assert 'class="check flight-option"' in html
 assert "querySelectorAll('.flight-option')" in js
 
-assert html.count("feeder-option") == 6
+assert html.count("feeder-option") == 3
 assert "querySelectorAll('.feeder-option')" in js
 assert "isGround && option.classList.contains('flight-option')" in js
 assert "ticketPanel').classList.toggle('disabled'" not in js
@@ -114,7 +116,7 @@ assert "state.journeyType = returnDate ? 'round_trip' : 'one_way'" in js
 assert "return_mode: 'date'" in js
 assert "duration_value: state.durationNights" in js
 assert "return_date: state.journeyType === 'round_trip' ? $('returnDate').value : null" in js
-assert "$('returnDate').addEventListener('change', syncJourneyDates)" in js
+assert "openCalendar('departureDate')" in js and "openCalendar('returnDate')" in js
 assert 'id="oneWayButton"' in html
 assert "$('oneWayButton').addEventListener('click'" in js
 assert "$('returnDate').value = ''" in js

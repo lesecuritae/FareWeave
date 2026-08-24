@@ -403,7 +403,12 @@ async def discover_stops(origin: str, destination: str) -> dict[str, Any]:
 
 
 def enrich_live_prices(schedule: dict[str, Any], live: dict[str, Any]) -> dict[str, Any]:
-    """Attach a Flix API fare only to one unambiguous matching GTFS journey."""
+    """Merge validated live Flix journeys and enrich matching GTFS journeys.
+
+    The GTFS query intentionally models direct trips only.  Flix live results
+    may contain valid transfer itineraries (for example Leipzig–Dresden–
+    Görlitz), so they must remain available even without a same-trip GTFS row.
+    """
     def route_time(route: dict[str, Any], side: str):
         value = route.get(side)
         if isinstance(value, dict): value = value.get("time")
@@ -435,10 +440,40 @@ def enrich_live_prices(schedule: dict[str, Any], live: dict[str, Any]) -> dict[s
         route["price_note"] = "Livepreis aus der Flix-Such-API; vor Buchung erneut prüfen."
         if match.get("booking_url"): route["booking_url"] = match["booking_url"]
         enriched += 1
-    schedule["routes"] = candidates[: len(schedule.get("routes") or [])]
+
+    def fingerprint(route: dict[str, Any]) -> tuple[str, str, str]:
+        departure, arrival = route_time(route, "departure"), route_time(route, "arrival")
+        return (
+            str(route.get("flix_kind") or route.get("type") or "").casefold(),
+            departure.astimezone(TZ).isoformat(timespec="minutes") if departure else "",
+            arrival.astimezone(TZ).isoformat(timespec="minutes") if arrival else "",
+        )
+
+    known = {fingerprint(route) for route in candidates}
+    live_added = 0
+    if (live.get("provider_status") or {}).get("ok") is True:
+        for route in live_routes:
+            key = fingerprint(route)
+            if not all(key) or key in known:
+                continue
+            candidates.append(dict(route))
+            known.add(key)
+            live_added += 1
+
+    candidates = rank_routes(candidates, "balanced")
+    schedule["candidate_routes"] = candidates
+    visible_limit = max(len(schedule.get("routes") or []), len(live.get("routes") or []))
+    schedule["routes"] = candidates[:visible_limit]
+    counts = {
+        kind: sum(str(route.get("flix_kind") or route.get("type") or "").casefold() == kind for route in candidates)
+        for kind in ("train", "bus", "mixed")
+    }
+    schedule["candidate_counts"] = counts
+    schedule["status"] = "ok" if candidates else ("failed" if schedule.get("status") == "failed" else "empty")
     schedule.setdefault("provider_status", {})["live_pricing"] = {
         "provider": "flix-api", "ok": (live.get("provider_status") or {}).get("ok") is True,
         "matched_prices": enriched, "candidate_prices": sum(len(items) for items in by_match.values()),
+        "live_routes_added": live_added,
         "error": (live.get("provider_status") or {}).get("error"),
     }
     return schedule

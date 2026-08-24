@@ -1,4 +1,13 @@
 # Changelog
+## 0.2.3 - 2026-08-24
+
+- Flix-Liveverbindungen mit Umstiegen werden als eigenständige Fahrten übernommen, wenn der direkte GTFS-Fahrplan keine durchgehende `trip_id` besitzt; Leipzig–Dresden–Görlitz bleibt als reale Regression abgedeckt.
+- Flix-Stadtsuchen normalisieren allgemeine Bahnhofszusätze, statt sich auf einen ungeeigneten ersten Autocomplete-Treffer zu verlassen. Bestätigte Stations-Alias-IDs verhindern unnötige Zubringer oder falsche Zielzuordnungen.
+- FlixTrain und FlixBus sind direkt im Hauptformular auswählbar. Manuelle Flix-Haltestellenfelder entfallen; die bestehende providerübergreifende Stationszuordnung arbeitet automatisch.
+- Ein gemeinsamer Kalender steuert Hin- und Rückreise. Der doppelte Abreisekalender entfällt, die Rückreise nutzt dieselben Mindestdatums-, Monats- und Auswahllogiken.
+- Die Betreiberanzeige für Mobilfunkabdeckung ist innerhalb der Fahrtkarte kompakter und bleibt ausschließlich auf tatsächlich berechnete OpenCellID-Betreiberwerte beschränkt.
+- Routing-Caches verwenden eine neue Generation, damit frühere leere Flix-Ergebnisse nach dem Update nicht weiter ausgeliefert werden.
+
 ## 0.2.2 - 2026-08-24
 
 - Provider-native Stations-IDs bleiben beim Zusammenführen als Alias-Menge erhalten; Flix löst ausgewählte Parent-, Child- und Geschwisterhaltestellen gemeinsam auf, damit Bus- und Zugfahrten desselben Stationskomplexes nicht verloren gehen.

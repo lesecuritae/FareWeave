@@ -184,6 +184,26 @@ def _normalized_station_name(value: Any) -> str:
     return " ".join(text.split())
 
 
+def _flix_city_query(value: str) -> str:
+    """Use the place name for trvl's city search, not a rail terminal label.
+
+    trvl currently selects the first Flix autocomplete result.  Queries such as
+    ``Leipzig Hbf`` can therefore resolve to a similarly ranked, unrelated
+    city.  Removing only terminal qualifiers makes the Flix city autocomplete
+    deterministic while the returned station IDs still identify the concrete
+    departure and arrival stops.
+    """
+    text = str(value or "").strip()
+    text = re.sub(r"\s*\(FlixTrain\)\s*$", "", text, flags=re.IGNORECASE).strip()
+    normalized = re.sub(
+        r"(?:\s*\([^)]*\))?\s+(?:hbf|hauptbahnhof|central\s+(?:train\s+)?station|zob|busbahnhof)\s*$",
+        "",
+        text,
+        flags=re.IGNORECASE,
+    ).strip(" ,-")
+    return normalized or text
+
+
 def _flix_exact_stop_matches_request(stop: Any, expected: str) -> bool:
     if not isinstance(stop, dict) or not stop.get("station"):
         return False
@@ -192,8 +212,16 @@ def _flix_exact_stop_matches_request(stop: Any, expected: str) -> bool:
     return bool(actual and requested and actual == requested)
 
 
-def _flix_transfer_requirement(stop: Any, requested: str, kind: str) -> dict[str, Any] | None:
+def _flix_transfer_requirement(
+    stop: Any,
+    requested: str,
+    kind: str,
+    accepted_station_ids: set[str] | None = None,
+) -> dict[str, Any] | None:
     if not isinstance(stop, dict) or not stop.get("station"):
+        return None
+    station_id = str(stop.get("station_id") or "").strip()
+    if station_id and station_id in (accepted_station_ids or set()):
         return None
     if _flix_exact_stop_matches_request(stop, requested):
         return None
@@ -973,11 +1001,13 @@ def compact_route_transfer_options(data: Any, max_results: int = 6) -> list[dict
 
 
 async def flix_search(request: ReiseRequest) -> dict[str, Any]:
+    origin_query = _flix_city_query(request.origin)
+    destination_query = _flix_city_query(request.destination)
     command = [
         TRVL_BIN,
         "ground",
-        request.origin,
-        request.destination,
+        origin_query,
+        destination_query,
         request.travel_date,
         "--provider", "flixbus",
         "--currency", "EUR",
@@ -1012,6 +1042,12 @@ async def flix_search(request: ReiseRequest) -> dict[str, Any]:
     bus_routes: list[dict[str, Any]] = []
     mixed_routes: list[dict[str, Any]] = []
     seen: set[tuple[Any, ...]] = set()
+    origin_station_ids = set(request.origin_station.ids_for("flix") if request.origin_station else [])
+    destination_station_ids = set(request.destination_station.ids_for("flix") if request.destination_station else [])
+    if request.flix_origin_stop_id:
+        origin_station_ids.add(request.flix_origin_stop_id)
+    if request.flix_destination_stop_id:
+        destination_station_ids.add(request.flix_destination_stop_id)
     for route in routes:
         if request.flix_origin_stop_id and str((route.get("departure") or {}).get("station_id") or "") != request.flix_origin_stop_id:
             continue
@@ -1058,8 +1094,12 @@ async def flix_search(request: ReiseRequest) -> dict[str, Any]:
             else "FlixBus" if kind == "bus"
             else "FlixBus/FlixTrain"
         )
-        departure_access = _flix_transfer_requirement(route.get("departure"), request.origin, "origin_to_flix_stop")
-        arrival_egress = _flix_transfer_requirement(route.get("arrival"), request.destination, "flix_stop_to_destination")
+        departure_access = _flix_transfer_requirement(
+            route.get("departure"), request.origin, "origin_to_flix_stop", origin_station_ids,
+        )
+        arrival_egress = _flix_transfer_requirement(
+            route.get("arrival"), request.destination, "flix_stop_to_destination", destination_station_ids,
+        )
         if departure_access:
             route["departure_access"] = departure_access
             route["direct_from_requested_origin"] = False

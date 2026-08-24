@@ -18,7 +18,7 @@ assert all("reise_assistent" not in str(x).casefold() for x in ops)
 fields = set(TripRequest.model_fields)
 for required in {"origin","destination","origin_station","destination_station","departure_date","deutschlandticket","deutschlandticket_only","duration_value","duration_unit","return_date","hotel_min_stars"}:
     assert required in fields
-assert CACHE_GENERATION == f"{APP_VERSION}-routing-v2"
+assert CACHE_GENERATION == f"{APP_VERSION}-routing-v3"
 assert bytes.fromhex("726571756573745f74657874").decode() not in fields
 assert PriceCalendarRequest.model_fields["calendar_days"].metadata[1].le == 14
 print("Strukturierter API-Vertrag: OK")

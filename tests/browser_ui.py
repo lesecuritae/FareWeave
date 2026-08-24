@@ -29,7 +29,7 @@ async def check_viewport(browser, width: int, height: int) -> None:
     assert await page.locator("body").evaluate("el => el.scrollWidth <= el.clientWidth"), f"horizontale Überbreite bei {width}x{height}"
     if width <= 620:
         assert await page.locator(".topbar").evaluate("el => getComputedStyle(el).position") == "static"
-    await page.locator("#calendarToggle").click()
+    await page.locator("#departureCalendarToggle").click()
     assert await page.locator("#calendarPanel").is_visible()
     assert await page.locator("#calendarDays button:not([disabled])").count() >= 20
     month = await page.locator("#calendarMonth").text_content()
@@ -40,6 +40,12 @@ async def check_viewport(browser, width: int, height: int) -> None:
     await selectable.click()
     assert await page.locator("#departureDate").input_value() == chosen
     assert not await page.locator("#calendarPanel").is_visible()
+    await page.locator("#returnCalendarToggle").click()
+    assert await page.locator("#calendarPanel").is_visible()
+    return_choice = page.locator("#calendarDays button:not([disabled])").last
+    chosen_return = await return_choice.get_attribute("data-calendar-date")
+    await return_choice.click()
+    assert await page.locator("#returnDate").input_value() == chosen_return
     await page.locator("#priceCalendarButton").scroll_into_view_if_needed()
     assert await page.locator("#priceCalendarButton").is_visible()
     if width <= 620:
@@ -105,7 +111,7 @@ async def main() -> None:
         await wait_selected(page, "origin")
         await page.locator("#destination").fill("Frankfurt(Main) Hbf")
         await wait_selected(page, "destination")
-        await page.locator("#departureDate").fill("2026-10-27")
+        await page.locator("#departureDate").evaluate("(el) => el.value = '2026-10-27'")
         await page.locator("#departureAfter").fill("03:00")
         await page.locator("#oneWayButton").click()
         await page.locator("#searchButton").click()

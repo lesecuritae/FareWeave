@@ -48,6 +48,18 @@ def composition(routes: list[dict]) -> tuple[int, int, int, int]:
     )
 
 
+def test_flix_city_query() -> None:
+    assert trvl._flix_city_query("Leipzig Hbf") == "Leipzig"
+    assert trvl._flix_city_query("Görlitz Hauptbahnhof") == "Görlitz"
+    assert trvl._flix_city_query("Frankfurt(Main) Hbf") == "Frankfurt"
+    assert trvl._flix_city_query("Dortmund Central Station (FlixTrain)") == "Dortmund"
+    assert trvl._flix_city_query("Leipzig Messe") == "Leipzig Messe"
+    assert trvl._flix_transfer_requirement(
+        {"station": "Görlitz", "station_id": "goerlitz-flix"},
+        "Görlitz Hbf", "flix_stop_to_destination", {"goerlitz-flix"},
+    ) is None
+
+
 async def test_flix_pool_and_classification() -> None:
     raw = [
         route("bus", 7, 9.99),
@@ -122,6 +134,7 @@ def test_total_budget() -> None:
 
 asyncio.run(test_flix_pool_and_classification())
 test_total_budget()
+test_flix_city_query()
 print("Flix-Rohpool und sichtbare DB-/Flix-Auswahl: OK")
 
 # Generic station-to-station access/egress composition regressions.

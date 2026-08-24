@@ -46,22 +46,22 @@
         <div class="date-grid">
           <label class="field departure-field">
             <span>Abreise</span>
-            <div class="date-input-row"><input id="departureDate" type="date" required><button id="calendarToggle" class="calendar-toggle" type="button" aria-expanded="false" aria-controls="calendarPanel">Kalender</button></div>
-            <div id="calendarPanel" class="calendar-panel hidden" aria-label="Abreisedatum wählen">
-              <div class="calendar-head"><button id="calendarPrevious" type="button" aria-label="Vorheriger Monat">←</button><strong id="calendarMonth"></strong><button id="calendarNext" type="button" aria-label="Nächster Monat">→</button></div>
-              <div class="calendar-weekdays" aria-hidden="true"><span>Mo</span><span>Di</span><span>Mi</span><span>Do</span><span>Fr</span><span>Sa</span><span>So</span></div>
-              <div id="calendarDays" class="calendar-days"></div>
-            </div>
+            <div class="date-input-row"><input id="departureDate" type="text" inputmode="none" readonly required><button id="departureCalendarToggle" class="calendar-toggle" type="button" aria-expanded="false" aria-controls="calendarPanel">Wählen</button></div>
           </label>
           <label class="field return-field">
             <span>Rückreise <small>(optional)</small></span>
-            <input id="returnDate" type="date">
+            <div class="date-input-row"><input id="returnDate" type="text" inputmode="none" readonly><button id="returnCalendarToggle" class="calendar-toggle" type="button" aria-expanded="false" aria-controls="calendarPanel">Wählen</button></div>
           </label>
           <button id="oneWayButton" type="button" class="secondary one-way-button" aria-pressed="false">Nur Hinfahrt</button>
           <label class="field compact departure-time-field">
             <span>Frühestens</span>
             <input id="departureAfter" type="time" value="06:00" required>
           </label>
+          <div id="calendarPanel" class="calendar-panel calendar-panel-field hidden" aria-label="Reisedatum wählen">
+            <div class="calendar-head"><button id="calendarPrevious" type="button" aria-label="Vorheriger Monat">←</button><strong id="calendarMonth"></strong><button id="calendarNext" type="button" aria-label="Nächster Monat">→</button></div>
+            <div class="calendar-weekdays" aria-hidden="true"><span>Mo</span><span>Di</span><span>Mi</span><span>Do</span><span>Fr</span><span>Sa</span><span>So</span></div>
+            <div id="calendarDays" class="calendar-days"></div>
+          </div>
           <div class="field flexible-search-field ground-only">
             <span>Flexible Preise</span>
             <div class="flexible-search-controls">
@@ -76,6 +76,14 @@
             <small>Ab dem gewählten Datum, maximal 14 Tage.</small>
           </div>
         </div>
+
+        <section class="transport-panel feeder-option" aria-labelledby="transportTitle">
+          <div><strong id="transportTitle">Zug &amp; Bus</strong><span>Provider direkt auswählen; passende Haltestellen werden automatisch zugeordnet.</span></div>
+          <div class="transport-choices">
+            <label class="check"><input id="includeFlixtrain" type="checkbox" checked> FlixTrain</label>
+            <label class="check"><input id="includeFlixbus" type="checkbox" checked> FlixBus</label>
+          </div>
+        </section>
 
         <div class="priority-row" id="ticketPanel">
           <div class="ticket-toggle">
@@ -120,10 +128,6 @@
         <details class="advanced">
           <summary>Weitere Optionen</summary>
           <div class="advanced-grid">
-            <label class="check feeder-option"><input id="includeFlixtrain" type="checkbox" checked> FlixTrain</label>
-            <label class="check feeder-option"><input id="includeFlixbus" type="checkbox" checked> FlixBus</label>
-            <label class="field feeder-option"><span>Flix-Abfahrtshalt</span><select id="flixOriginStop"><option value="">Automatisch</option></select></label>
-            <label class="field feeder-option"><span>Flix-Ankunftshalt</span><select id="flixDestinationStop"><option value="">Automatisch</option></select></label>
             <label class="check feeder-option"><input id="splitTicket" type="checkbox" checked> Split-Tickets prüfen</label>
             <label class="check flight-option"><input id="destinationTransfer" type="checkbox" checked> Flughafen-Transfer</label>
             <label class="field flight-option">

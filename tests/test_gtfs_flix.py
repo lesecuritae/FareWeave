@@ -136,6 +136,23 @@ ambiguous = {**live, "candidate_routes": live["candidate_routes"] * 2}
 schedule["candidate_routes"][0]["price"] = None
 assert enrich_live_prices(schedule, ambiguous)["candidate_routes"][0]["price"] is None
 
+transfer_live = {
+    "routes": [{
+        "departure": {"station": "Leipzig Hbf", "time": "2026-08-24T08:00:00+02:00"},
+        "arrival": {"station": "Görlitz Hbf", "time": "2026-08-24T13:00:00+02:00"},
+        "flix_kind": "bus", "type": "bus", "provider": "FlixBus", "transfers": 1,
+        "price": 19.49, "currency": "EUR",
+    }],
+    "candidate_routes": [],
+    "provider_status": {"ok": True},
+}
+transfer_schedule = {"status": "empty", "routes": [], "candidate_routes": [], "provider_status": {"ok": True}}
+merged_transfer = enrich_live_prices(transfer_schedule, transfer_live)
+assert merged_transfer["status"] == "ok"
+assert len(merged_transfer["routes"]) == 1
+assert merged_transfer["routes"][0]["transfers"] == 1
+assert merged_transfer["provider_status"]["live_pricing"]["live_routes_added"] == 1
+
 
 async def fresh_feed_does_not_wait_for_refresh_lock():
     """A second search must not block behind a long-running GTFS refresh."""

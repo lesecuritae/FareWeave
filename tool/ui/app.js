@@ -13,6 +13,7 @@ function localIso(value) {
 }
 
 let calendarMonth = new Date();
+let calendarTarget = 'departureDate';
 let activeSearch = null;
 let coverageQueue = [];
 let coverageGeneration = 0;
@@ -40,8 +41,9 @@ async function pollProgress(search) {
 }
 
 function renderCalendar() {
-  const selected = $('departureDate').value;
-  const minimum = $('departureDate').min;
+  const field = $(calendarTarget);
+  const selected = field.value;
+  const minimum = field.min;
   $('calendarMonth').textContent = new Intl.DateTimeFormat('de-DE', {month:'long', year:'numeric'}).format(calendarMonth);
   const first = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth(), 1);
   const offset = (first.getDay() + 6) % 7;
@@ -54,12 +56,26 @@ function renderCalendar() {
   }
   $('calendarDays').innerHTML = buttons.join('');
   $('calendarDays').querySelectorAll('[data-calendar-date]').forEach(button => button.addEventListener('click', () => {
-    $('departureDate').value = button.dataset.calendarDate;
-    syncJourneyDates(); refreshFlixStops(); renderCalendar();
-    $('calendarPanel').classList.add('hidden'); $('calendarToggle').setAttribute('aria-expanded', 'false');
+    field.value = button.dataset.calendarDate;
+    syncJourneyDates(); renderCalendar(); closeCalendar();
   }));
   const current = new Date();
   $('calendarPrevious').disabled = calendarMonth.getFullYear() === current.getFullYear() && calendarMonth.getMonth() === current.getMonth();
+}
+
+function closeCalendar() {
+  $('calendarPanel').classList.add('hidden');
+  ['departureCalendarToggle', 'returnCalendarToggle'].forEach(id => $(id).setAttribute('aria-expanded', 'false'));
+}
+
+function openCalendar(target) {
+  calendarTarget = target;
+  const selected = $(target).value || $(target).min || $('departureDate').value;
+  const [year, month] = selected.split('-').map(Number);
+  calendarMonth = new Date(year, month - 1, 1);
+  $('calendarPanel').classList.remove('hidden');
+  ['departureCalendarToggle', 'returnCalendarToggle'].forEach(id => $(id).setAttribute('aria-expanded', String(id.startsWith(target === 'departureDate' ? 'departure' : 'return'))));
+  renderCalendar();
 }
 
 function setTodayDefaults() {
@@ -125,7 +141,6 @@ function setDepartureDate(value) {
     $('returnDate').value = localIso(nextReturn);
   }
   syncJourneyDates();
-  refreshFlixStops();
   renderCalendar();
 }
 
@@ -257,8 +272,8 @@ function getPayload() {
     deutschlandticket_only: state.travelMode === 'ground' && state.dticket && document.getElementById('dticketOnly').checked,
     include_flixtrain: state.travelMode !== 'flight_stay' && $('includeFlixtrain').checked,
     include_flixbus: state.travelMode !== 'flight_stay' && $('includeFlixbus').checked,
-    flix_origin_stop_id: $('flixOriginStop').value || null,
-    flix_destination_stop_id: $('flixDestinationStop').value || null,
+    flix_origin_stop_id: null,
+    flix_destination_stop_id: null,
     split_ticket_check: state.travelMode !== 'flight_stay' && $('splitTicket').checked,
     include_destination_transfer: state.travelMode !== 'ground' && $('destinationTransfer').checked,
     origin_airports: originAirports,
@@ -293,7 +308,6 @@ function selectStation(field, station) {
     $(field).value = station.name;
     $(field).dataset.selected = 'true';
     $(`${field}Suggestions`).classList.add('hidden');
-    refreshFlixStops();
   }
 }
 
@@ -320,38 +334,6 @@ function bindStationInput(field) {
     stationTimers[field] = setTimeout(() => findStations(field), 250);
   });
   $(field).addEventListener('focus', () => { if ($(field).value.trim().length >= 2) findStations(field); });
-}
-
-function replaceStopOptions(select, stops) {
-  const selected = select.value;
-  select.replaceChildren(new Option("Automatisch", ""));
-  (stops || []).forEach(stop => {
-    const detail = [stop.city, stop.address].filter(Boolean).join(" · ");
-    select.add(new Option(detail ? stop.name + " — " + detail : stop.name, stop.station_id));
-  });
-  select.value = Array.from(select.options).some(option => option.value === selected) ? selected : "";
-}
-
-async function refreshFlixStops() {
-  const origin = document.getElementById("origin").value.trim();
-  const destination = document.getElementById("destination").value.trim();
-  const travelDate = document.getElementById("departureDate").value;
-  if (!origin || !destination || !travelDate || state.travelMode !== "ground") {
-    replaceStopOptions(document.getElementById("flixOriginStop"), []);
-    replaceStopOptions(document.getElementById("flixDestinationStop"), []);
-    return;
-  }
-  const params = new URLSearchParams({origin: origin, destination: destination, travel_date: travelDate, departure_after: document.getElementById("departureAfter").value || "00:00"});
-  try {
-    const response = await fetch("/api/flix-stops?" + params.toString());
-    if (!response.ok) throw new Error("HTTP " + response.status);
-    const data = await response.json();
-    replaceStopOptions(document.getElementById("flixOriginStop"), data.origin_stops);
-    replaceStopOptions(document.getElementById("flixDestinationStop"), data.destination_stops);
-  } catch (_) {
-    replaceStopOptions(document.getElementById("flixOriginStop"), []);
-    replaceStopOptions(document.getElementById("flixDestinationStop"), []);
-  }
 }
 
 function actionLinks(offerUrl, manualUrl) {
@@ -460,10 +442,7 @@ function coverageResultHtml(data) {
   }
   const networks = (data.operator_networks || []).map(network => {
     const percent = network.coverage_percent;
-    const gaps = (network.weak_sections || []).map(gap =>
-      `<li>km ${esc(gap.from_km)}–${esc(gap.to_km)} · ca. ${esc(gap.length_km)} km${gap.between?.filter(Boolean).length ? ` · ${esc(gap.between.filter(Boolean).join(' → '))}` : ''}</li>`
-    ).join('');
-    return `<div class="coverage-network"><div><strong>${esc(network.name)}</strong><span>${percent === null || percent === undefined ? 'keine Daten' : `${esc(percent)} %`}</span></div><div class="coverage-meter" role="meter" aria-label="${esc(network.name)} Mobilfunkabdeckung" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${esc(percent ?? 0)}"><i style="width:${Math.max(0, Math.min(100, Number(percent) || 0))}%"></i></div>${gaps ? `<details class="coverage-details"><summary>Details</summary><ul>${gaps}</ul></details>` : ''}</div>`;
+    return `<div class="coverage-network"><div><strong>${esc(network.name)}</strong><span>${percent === null || percent === undefined ? 'keine Daten' : `${esc(percent)} %`}</span></div><div class="coverage-meter" role="meter" aria-label="${esc(network.name)} Mobilfunkabdeckung" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${esc(percent ?? 0)}"><i style="width:${Math.max(0, Math.min(100, Number(percent) || 0))}%"></i></div></div>`;
   }).join('');
   if (!networks) return '<p class="coverage-unavailable">Betreiberdaten nicht verfügbar</p>';
   return networks;
@@ -636,18 +615,10 @@ function bind() {
     state.hotelType = btn.dataset.hotelType;
     syncHotelType();
   }));
-  $('departureDate').addEventListener('change', () => { syncJourneyDates(); refreshFlixStops(); });
-  $('calendarToggle').addEventListener('click', () => {
-    const panel = $('calendarPanel'); panel.classList.toggle('hidden');
-    $('calendarToggle').setAttribute('aria-expanded', String(!panel.classList.contains('hidden')));
-    renderCalendar();
-  });
+  $('departureCalendarToggle').addEventListener('click', () => openCalendar('departureDate'));
+  $('returnCalendarToggle').addEventListener('click', () => openCalendar('returnDate'));
   $('calendarPrevious').addEventListener('click', () => { calendarMonth = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth()-1, 1); renderCalendar(); });
   $('calendarNext').addEventListener('click', () => { calendarMonth = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth()+1, 1); renderCalendar(); });
-  $('departureAfter').addEventListener('change', refreshFlixStops);
-  $('origin').addEventListener('blur', refreshFlixStops);
-  $('destination').addEventListener('blur', refreshFlixStops);
-  $('returnDate').addEventListener('change', syncJourneyDates);
   $('oneWayButton').addEventListener('click', () => {
     $('returnDate').value = '';
     syncJourneyDates();
