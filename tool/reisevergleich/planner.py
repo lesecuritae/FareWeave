@@ -449,7 +449,10 @@ async def complete_trip(request: TripRequest) -> dict[str, Any]:
                     max_nightly_price=request.hotel_max_nightly_price,
                     min_stars=hotel_min_stars,
                     property_type=hotel_property_type,
-                    max_results=request.max_results,
+                    # TripRequest erlaubt bis zu 48 Reiseoptionen, HotelRequest nur 10.
+                    # Ohne Begrenzung wirft pydantic hier einen ValidationError und die
+                    # gesamte Suche endet in HTTP 500 (die UI sendet fest max_results=24).
+                    max_results=min(request.max_results, 10),
                 )))
 
             resolved: dict[str, Any] = {}
