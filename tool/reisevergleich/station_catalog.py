@@ -33,6 +33,7 @@ def _distance_km(left: dict[str, Any], right: dict[str, Any]) -> float | None:
 _SECONDARY_STATION_WORDS = {
     "ausgang", "südausgang", "nordausgang", "ostausgang", "westausgang",
     "eingang", "zugang", "bahnsteig", "gleis", "vorplatz", "parkplatz", "park",
+    "nebenhaltestelle",
 }
 
 
@@ -42,7 +43,7 @@ def _station_role_score(name: str, item: dict[str, Any] | None = None) -> int:
     if "bahnhof" in words:
         score += 220
     if words & _SECONDARY_STATION_WORDS:
-        score -= 350
+        score -= 450
     item = item or {}
     modes = {str(mode).upper() for mode in item.get("modes") or []}
     if modes & {"HIGHSPEED_RAIL", "LONG_DISTANCE", "NIGHT_RAIL"}:
@@ -188,7 +189,14 @@ async def _search_uncached(normalized: str, limit: int) -> dict[str, Any]:
     for item, score in zip(ranked, scores):
         item["type"] = "airport" if "airport" in location_key(item["name"]).split() or "flughafen" in location_key(item["name"]).split() else "station"
         item["confidence"] = round(min(0.99, max(0.01, score / 1050)), 2)
-    explicit_station = any(token in exact_location_key(normalized).split() for token in {"hbf", "hauptbahnhof", "bahnhof", "station", "zob", "terminal", "airport", "flughafen"})
+    normalized_key = exact_location_key(normalized)
+    explicit_station = any(token in normalized_key.split() for token in {"hbf", "hauptbahnhof", "bahnhof", "station", "zob", "terminal", "airport", "flughafen"})
+    exact_confirmed_station = bool(
+        len(ranked) == 1
+        and exact_location_key(ranked[0]["name"]) == normalized_key
+        and (ranked[0].get("is_station") is True or str(ranked[0].get("location_type") or "") == "1")
+    )
+    explicit_station = explicit_station or exact_confirmed_station
     auto = ranked[0] if ranked and explicit_station else None
     return {
         "query": normalized, "stations": ranked, "provider_status": statuses,
