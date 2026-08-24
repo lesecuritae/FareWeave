@@ -10,6 +10,7 @@ import httpx
 from .airports import airport_identity_matches, provider_location_query
 from .config import TRANSITOUS_TIMEOUT, TRANSITOUS_URL, TRANSITOUS_USER_AGENT, TZ
 from .db import build_manual_db_links
+from .location_resolver import location_candidates, location_match_is_safe
 from .models import ReiseRequest
 from .utils import as_int, normalize_text
 
@@ -60,6 +61,24 @@ def choose_match(matches: Any, query: str) -> dict[str, Any] | None:
     return max(scored, key=lambda entry: entry[0])[1] if scored else None
 
 
+async def _resolve_stop(client: httpx.AsyncClient, value: str) -> tuple[dict[str, Any] | None, str, list[str]]:
+    """Resolve the exact input first and use translated city spelling as fallback."""
+    last_names: list[str] = []
+    candidates = location_candidates(value)
+    for lookup in candidates:
+        response = await client.get(
+            f"{TRANSITOUS_URL}/api/v1/geocode",
+            params={"text": lookup, "type": "STOP", "language": "de", "numResults": 12},
+        )
+        response.raise_for_status()
+        matches = response.json()
+        last_names = [str(x.get("name") or "") for x in matches[:8] if isinstance(x, dict)] if isinstance(matches, list) else []
+        selected = choose_match(matches, lookup)
+        if selected and location_match_is_safe(value, str(selected.get("name") or "")):
+            return selected, lookup, last_names
+    return None, candidates[-1], last_names
+
+
 async def search(request: ReiseRequest, *, deutschlandticket_only: bool = False) -> dict[str, Any]:
     headers = {"User-Agent": TRANSITOUS_USER_AGENT, "Accept": "application/json"}
     timeout = httpx.Timeout(TRANSITOUS_TIMEOUT, connect=min(8, TRANSITOUS_TIMEOUT))
@@ -71,30 +90,20 @@ async def search(request: ReiseRequest, *, deutschlandticket_only: bool = False)
     }
     try:
         async with httpx.AsyncClient(timeout=timeout, headers=headers, follow_redirects=True) as client:
-            origin_lookup = provider_location_query(request.origin)
-            destination_lookup = provider_location_query(request.destination)
-            origin_response, destination_response = await asyncio.gather(
-                client.get(
-                    f"{TRANSITOUS_URL}/api/v1/geocode",
-                    params={"text": origin_lookup, "type": "STOP", "language": "de", "numResults": 12},
-                ),
-                client.get(
-                    f"{TRANSITOUS_URL}/api/v1/geocode",
-                    params={"text": destination_lookup, "type": "STOP", "language": "de", "numResults": 12},
-                ),
+            origin_query = provider_location_query(request.origin)
+            destination_query = provider_location_query(request.destination)
+            origin_result, destination_result = await asyncio.gather(
+                _resolve_stop(client, origin_query),
+                _resolve_stop(client, destination_query),
             )
-            origin_response.raise_for_status()
-            destination_response.raise_for_status()
-            origin_matches = origin_response.json()
-            destination_matches = destination_response.json()
-            origin = choose_match(origin_matches, request.origin)
-            destination = choose_match(destination_matches, request.destination)
+            origin, origin_lookup, origin_candidates = origin_result
+            destination, destination_lookup, destination_candidates = destination_result
             diagnostic["origin_lookup_query"] = origin_lookup
             diagnostic["destination_lookup_query"] = destination_lookup
             if not origin or not destination:
                 diagnostic["error"] = "Start oder Ziel wurde bei Transitous nicht sicher gefunden."
-                diagnostic["origin_candidates"] = [str(x.get("name") or "") for x in origin_matches[:8] if isinstance(x, dict)] if isinstance(origin_matches, list) else []
-                diagnostic["destination_candidates"] = [str(x.get("name") or "") for x in destination_matches[:8] if isinstance(x, dict)] if isinstance(destination_matches, list) else []
+                diagnostic["origin_candidates"] = origin_candidates
+                diagnostic["destination_candidates"] = destination_candidates
                 return {"routes": [], "diagnostic": diagnostic}
 
             local_dt = datetime.fromisoformat(
@@ -185,6 +194,7 @@ def normalize_routes(
                 "mode": leg.get("mode"),
                 "line": leg.get("displayName") or leg.get("routeShortName") or leg.get("tripShortName"),
                 "provider": leg.get("agencyName") or "Transitous",
+                "operator": leg.get("agencyName") or "Transitous",
                 "origin": {"id": from_place.get("stopId"), "name": from_place.get("name")},
                 "destination": {"id": to_place.get("stopId"), "name": to_place.get("name")},
                 "departure": leg.get("scheduledStartTime") or leg.get("startTime"),

@@ -3,11 +3,11 @@ from __future__ import annotations
 import json
 import re
 import subprocess
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any
 from urllib.parse import quote, urlencode
 
-from .config import TZ
+from .config import SEARCH_DEPARTURE_TOLERANCE_MINUTES, TZ
 
 
 def as_float(value: Any) -> float:
@@ -38,16 +38,50 @@ def parse_datetime(value: Any) -> datetime | None:
 
 def route_departure_in_window(
     route: dict[str, Any], travel_date: str, departure_after: str,
+    *, tolerance_minutes: int = 0,
 ) -> bool:
-    """Return whether a normalized route departs at/after the local request floor."""
+    """Accept the requested day plus the configured, explicit early tolerance."""
     departure = route.get("departure")
     if isinstance(departure, dict):
         departure = departure.get("time")
     parsed = parse_datetime(departure)
     if not parsed:
         return False
-    floor = datetime.fromisoformat(f"{travel_date}T{departure_after}:00").replace(tzinfo=TZ)
-    return parsed.astimezone(TZ) >= floor
+    requested = datetime.fromisoformat(f"{travel_date}T{departure_after}:00").replace(tzinfo=TZ)
+    local = parsed.astimezone(TZ)
+    tolerance = min(max(int(tolerance_minutes), 0), 60)
+    return requested - timedelta(minutes=tolerance) <= local < requested.replace(hour=0, minute=0) + timedelta(days=1)
+
+
+def departure_offset_minutes(route: dict[str, Any], travel_date: str, departure_after: str) -> int | None:
+    departure = route.get("departure")
+    if isinstance(departure, dict):
+        departure = departure.get("time")
+    parsed = parse_datetime(departure)
+    if parsed is None:
+        return None
+    requested = datetime.fromisoformat(f"{travel_date}T{departure_after}:00").replace(tzinfo=TZ)
+    return round((parsed.astimezone(TZ) - requested).total_seconds() / 60)
+
+
+def departure_search_floor(travel_date: str, departure_after: str) -> tuple[str, str]:
+    requested = datetime.fromisoformat(f"{travel_date}T{departure_after}:00").replace(tzinfo=TZ)
+    floor = requested - timedelta(minutes=SEARCH_DEPARTURE_TOLERANCE_MINUTES)
+    if floor.date() != requested.date():
+        return requested.date().isoformat(), "00:00"
+    return floor.date().isoformat(), floor.strftime("%H:%M")
+
+
+def annotate_departure_tolerance(
+    route: dict[str, Any], travel_date: str, departure_after: str,
+) -> dict[str, Any]:
+    annotated = dict(route)
+    offset = departure_offset_minutes(route, travel_date, departure_after)
+    if offset is not None:
+        annotated["departure_offset_minutes"] = offset
+        if -SEARCH_DEPARTURE_TOLERANCE_MINUTES <= offset < 0:
+            annotated["early_departure_minutes"] = abs(offset)
+    return annotated
 
 
 def local_iso(value: Any) -> str | None:

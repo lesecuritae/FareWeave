@@ -9,7 +9,8 @@ from fastapi import APIRouter, Header, HTTPException, Query
 from .airports import AIRPORT_CITY_NAMES, AIRPORT_STATIONS
 from .cache import health as cache_health
 from .config import APP_VERSION, DB_API_URL, TRANSITOUS_URL, TRANSITOUS_USER_AGENT, today_iso
-from .models import ReiseRequest, TripRequest
+from .models import CoverageRequest, ReiseRequest, TripRequest
+from .coverage import analyze_route
 from .service import search
 from .progress import begin as begin_progress, end as end_progress, get as get_progress, valid_search_id
 from .gtfs_flix import discover_stops as discover_gtfs_flix_stops
@@ -45,6 +46,13 @@ async def search_status(search_id: str) -> dict[str, Any]:
     return result
 
 
+@router.post("/api/coverage", summary="Mobiles Breitband entlang einer Fahrt analysieren")
+async def coverage(request: CoverageRequest) -> dict[str, Any]:
+    # Separate endpoint by design: provider latency or failure can never delay
+    # the journey response that triggered this optional enrichment.
+    return await analyze_route(request.route)
+
+
 @router.get("/api/flix-stops")
 async def flix_stops(origin: str = Query(min_length=1), destination: str = Query(min_length=1)) -> dict[str, Any]:
     return await discover_gtfs_flix_stops(origin, destination)
@@ -75,7 +83,7 @@ async def health() -> dict[str, Any]:
         "version": APP_VERSION,
         "current_date": today_iso(),
         "architecture": "deterministic",
-        "providers": ["DB/db-vendo", "Transitous", "Flix", "trvl"],
+        "providers": ["DB/db-vendo", "Transitous", "Flix", "trvl", "BNetzA Mobilfunk-Monitoring"],
     }
 
 

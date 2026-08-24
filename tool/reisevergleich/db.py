@@ -8,6 +8,7 @@ from urllib.parse import quote, urlencode
 import httpx
 
 from .config import DB_API_URL, DB_SEARCH_TIMEOUT, DB_SPLIT_TIMEOUT, TZ
+from .location_resolver import location_candidates, location_match_is_safe
 from .models import DeutschlandticketRequest, ReiseRequest
 from .utils import as_float, as_int, local_iso
 
@@ -132,41 +133,57 @@ async def db_search_with_retry(
 ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
     diagnostics: list[dict[str, Any]] = []
     last: dict[str, Any] = {"status": "failed", "journeys": []}
+    location_pairs = list(dict.fromkeys(
+        (origin_candidate, destination_candidate)
+        for origin_candidate in location_candidates(origin)
+        for destination_candidate in location_candidates(destination)
+    ))
     for attempt in range(1, max(1, attempts) + 1):
-        try:
-            last = await db_search(
-                origin=origin,
-                destination=destination,
-                travel_date=travel_date,
-                departure_after=departure_after,
-                mode=mode,
-                max_transfers=max_transfers,
-                results=results,
-                arrival_before=arrival_before,
-                bestprice=bestprice,
-                not_only_fast_routes=not_only_fast_routes,
-            )
-            diagnostics.append({
-                "source": "db-api",
-                "attempt": attempt,
-                "ok": bool(last.get("journeys")),
-                "source_profile": last.get("source"),
-                "routes": len(last.get("journeys") or []),
-                "resolved_origin": (last.get("origin") or {}).get("name") if isinstance(last.get("origin"), dict) else None,
-                "resolved_destination": (last.get("destination") or {}).get("name") if isinstance(last.get("destination"), dict) else None,
-                "time_mode": (last.get("diagnostics") or {}).get("time_mode") if isinstance(last.get("diagnostics"), dict) else None,
-                "arrival_before": (last.get("diagnostics") or {}).get("arrival_before") if isinstance(last.get("diagnostics"), dict) else None,
-                "backend_attempts": last.get("attempts") or [],
-            })
-            if last.get("journeys"):
-                return last, diagnostics
-        except Exception as exc:
-            diagnostics.append({
-                "source": "db-api",
-                "attempt": attempt,
-                "ok": False,
-                "error": f"{type(exc).__name__}: {exc}",
-            })
+        for origin_candidate, destination_candidate in location_pairs:
+            try:
+                last = await db_search(
+                    origin=origin_candidate,
+                    destination=destination_candidate,
+                    travel_date=travel_date,
+                    departure_after=departure_after,
+                    mode=mode,
+                    max_transfers=max_transfers,
+                    results=results,
+                    arrival_before=arrival_before,
+                    bestprice=bestprice,
+                    not_only_fast_routes=not_only_fast_routes,
+                )
+                diagnostics.append({
+                    "source": "db-api",
+                    "attempt": attempt,
+                    "lookup_origin": origin_candidate,
+                    "lookup_destination": destination_candidate,
+                    "ok": bool(last.get("journeys")),
+                    "source_profile": last.get("source"),
+                    "routes": len(last.get("journeys") or []),
+                    "resolved_origin": (last.get("origin") or {}).get("name") if isinstance(last.get("origin"), dict) else None,
+                    "resolved_destination": (last.get("destination") or {}).get("name") if isinstance(last.get("destination"), dict) else None,
+                    "time_mode": (last.get("diagnostics") or {}).get("time_mode") if isinstance(last.get("diagnostics"), dict) else None,
+                    "arrival_before": (last.get("diagnostics") or {}).get("arrival_before") if isinstance(last.get("diagnostics"), dict) else None,
+                    "backend_attempts": last.get("attempts") or [],
+                })
+                resolved_origin = (last.get("origin") or {}).get("name") if isinstance(last.get("origin"), dict) else None
+                resolved_destination = (last.get("destination") or {}).get("name") if isinstance(last.get("destination"), dict) else None
+                safe_locations = (
+                    location_match_is_safe(origin, resolved_origin)
+                    and location_match_is_safe(destination, resolved_destination)
+                )
+                if last.get("journeys") and safe_locations:
+                    return last, diagnostics
+            except Exception as exc:
+                diagnostics.append({
+                    "source": "db-api",
+                    "attempt": attempt,
+                    "lookup_origin": origin_candidate,
+                    "lookup_destination": destination_candidate,
+                    "ok": False,
+                    "error": f"{type(exc).__name__}: {exc}",
+                })
         if attempt < attempts:
             await asyncio.sleep(min(attempt, 2))
     return last, diagnostics
@@ -182,6 +199,16 @@ async def db_split_analysis(analysis_token: str) -> dict[str, Any]:
 
 
 def rank_routes(routes: list[dict[str, Any]], preference: str) -> list[dict[str, Any]]:
+    def departure_priority(route: dict[str, Any]) -> tuple[int, int]:
+        offset = route.get("departure_offset_minutes")
+        if not isinstance(offset, int):
+            return 3, 0
+        if offset == 0:
+            return 0, 0
+        if offset < 0:
+            return 1, abs(offset)
+        return 2, offset
+
     def price(route: dict[str, Any]) -> float:
         if route.get("price_complete") is False:
             return 1_000_000.0
@@ -196,13 +223,13 @@ def rank_routes(routes: list[dict[str, Any]], preference: str) -> list[dict[str,
         return value if value > 0 else 1_000_000
 
     if preference == "cheapest":
-        key = lambda route: (price(route), duration(route))
+        key = lambda route: (*departure_priority(route), price(route), duration(route))
     elif preference == "fastest":
-        key = lambda route: (duration(route), price(route))
+        key = lambda route: (*departure_priority(route), duration(route), price(route))
     elif preference == "fewest_transfers":
-        key = lambda route: (as_int(route.get("transfers")), duration(route), price(route))
+        key = lambda route: (*departure_priority(route), as_int(route.get("transfers")), duration(route), price(route))
     else:
-        key = lambda route: (
+        key = lambda route: (*departure_priority(route),
             price(route) + duration(route) * 0.12 + as_int(route.get("transfers")) * 8,
             duration(route),
         )
@@ -232,6 +259,8 @@ def compact_route(route: dict[str, Any], *, include_legs: bool = True) -> dict[s
         "best_split_price": round(split_price, 2) if split_price > 0 else None,
         "split_savings": route.get("split_savings") if split_price > 0 else None,
         "booking_url": route.get("booking_url"),
+        "departure_offset_minutes": route.get("departure_offset_minutes"),
+        "early_departure_minutes": route.get("early_departure_minutes"),
     }
     if include_legs:
         legs = []
@@ -240,6 +269,20 @@ def compact_route(route: dict[str, Any], *, include_legs: bool = True) -> dict[s
                 continue
             origin = leg.get("origin") or {}
             destination = leg.get("destination") or {}
+            stopovers = [
+                {
+                    key: value
+                    for key, value in {
+                        "name": stop.get("name"),
+                        "station_id": stop.get("id"),
+                        "latitude": stop.get("latitude"),
+                        "longitude": stop.get("longitude"),
+                    }.items()
+                    if value not in (None, "")
+                }
+                for stop in (leg.get("stopovers") or [])[:40]
+                if isinstance(stop, dict) and stop.get("name")
+            ]
             legs.append({
                 key: value for key, value in {
                     "mode": leg.get("mode") or leg.get("type"),
@@ -258,6 +301,7 @@ def compact_route(route: dict[str, Any], *, include_legs: bool = True) -> dict[s
                     "arrival": local_iso(leg.get("arrival")),
                     "reliability": leg.get("reliability"),
                     "connection_reliability": leg.get("connection_reliability"),
+                    "stopovers": stopovers,
                 }.items() if value not in (None, "", [])
             })
         if legs:

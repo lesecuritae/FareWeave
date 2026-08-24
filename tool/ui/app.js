@@ -13,6 +13,8 @@ function localIso(value) {
 
 let calendarMonth = new Date();
 let activeSearch = null;
+let coverageQueue = [];
+let coverageGeneration = 0;
 const progressLabels = {db:'Deutsche Bahn', transitous:'Transitous', gtfs:'GTFS-Fahrplan', flixbus:'FlixBus', flixtrain:'FlixTrain', merge:'Ergebnisaufbereitung'};
 const statusLabels = {waiting:'wartet', loading:'wird geladen', processing:'wird verarbeitet', completed:'abgeschlossen', empty:'keine Ergebnisse', failed:'fehlgeschlagen', cancelled:'abgebrochen'};
 
@@ -330,12 +332,54 @@ function reliabilityHtml(connection) {
   return `<div class="reliability-summary"><strong>${esc(reliability.label)} · ${approximate}${esc(reliability.percent)} %</strong>${confidence}</div>${details}`;
 }
 
+function coverageResultHtml(data) {
+  if (!data || data.status !== 'ok') {
+    return '<p class="coverage-unavailable">Mobilfunkanalyse momentan nicht verfügbar</p>';
+  }
+  const networks = (data.networks || []).map(network => {
+    const percent = network.coverage_percent;
+    const gaps = (network.weak_sections || []).map(gap =>
+      `<li>km ${esc(gap.from_km)}–${esc(gap.to_km)} · ca. ${esc(gap.length_km)} km${gap.between?.filter(Boolean).length ? ` · ${esc(gap.between.filter(Boolean).join(' → '))}` : ''}</li>`
+    ).join('');
+    return `<div class="coverage-network"><div><strong>${esc(network.name)}</strong><span>${percent === null || percent === undefined ? 'keine Daten' : `${esc(percent)} %`}</span></div><div class="coverage-meter" role="meter" aria-label="${esc(network.name)} Mobilfunkabdeckung" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${esc(percent ?? 0)}"><i style="width:${Math.max(0, Math.min(100, Number(percent) || 0))}%"></i></div>${gaps ? `<details><summary>Schwache Abschnitte</summary><ul>${gaps}</ul></details>` : '<small>Keine längere Lücke im analysierten Verlauf erkannt.</small>'}</div>`;
+  }).join('');
+  const scope = data.scope === 'germany_only' ? ` · ${esc(data.outside_source_area_count)} Punkte außerhalb Deutschlands nicht bewertet` : '';
+  const operatorNote = data.operator_specific?.message ? `<p class="coverage-note">${esc(data.operator_specific.message)} Berücksichtigte Betreiber: ${esc((data.operator_specific.operators_considered || []).join(', '))}.</p>` : '';
+  return `${networks}<p class="coverage-note">${esc(data.method || '')} · ${esc(data.evaluated_sample_count ?? data.sample_count)} von ${esc(data.sample_count)} Prüfpunkten · ca. ${esc(data.route_distance_km)} km${scope}</p>${operatorNote}<a class="link coverage-source" href="${esc(data.source?.url || '#')}" target="_blank" rel="noopener noreferrer">Quelle: ${esc(data.source?.name || 'Mobilfunkdaten')} · Stand ${esc(data.source?.revision || 'siehe Quelle')} · ${esc(data.source?.attribution || '')}</a>`;
+}
+
+async function loadCoverage() {
+  const queue = [...coverageQueue];
+  let next = 0;
+  async function worker() {
+    while (next < queue.length) {
+      const {id, route} = queue[next++];
+      const target = document.querySelector(`[data-coverage-id="${id}"] .coverage-content`);
+      if (!target) continue;
+      try {
+        const response = await fetch('/api/coverage', {
+          method: 'POST',
+          headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({route}),
+        });
+        const data = await response.json();
+        target.innerHTML = coverageResultHtml(response.ok ? data : null);
+      } catch (_) {
+        target.innerHTML = coverageResultHtml(null);
+      }
+    }
+  }
+  await Promise.all(Array.from({length: Math.min(3, queue.length)}, worker));
+}
+
 function groundConnectionsHtml(title, component) {
   const connections = component?.connections || [];
   if (!connections.length) {
     return `<section class="direction-group" data-direction="${esc(title)}"><div class="direction-heading"><div><span class="eyebrow">Bahn & Bus</span><h2>${esc(title)}</h2></div><span class="muted">0 Verbindungen</span></div><article class="result-card"><p class="muted">Keine automatisch auswertbare Verbindung gefunden.</p></article></section>`;
   }
   const cards = connections.map(connection => {
+    const coverageId = `coverage-${coverageGeneration}-${coverageQueue.length}`;
+    coverageQueue.push({id: coverageId, route: connection});
     const labels = (connection.labels || []).map(label => `<span class="badge ${label === 'D-Ticket' ? 'ticket' : ''}">${esc(label)}</span>`).join('');
     const price = connection.deutschlandticket_covered
       ? '0 € zusätzlich'
@@ -346,12 +390,17 @@ function groundConnectionsHtml(title, component) {
     const transfers = connection.transfers !== undefined
       ? `${connection.transfers} ${connection.transfers === 1 ? 'Umstieg' : 'Umstiege'}`
       : '';
-    return `<article class="result-card connection-card"><div class="card-head"><div><div class="connection-labels">${labels}</div><h3>${hm(connection.departure?.time || connection.departure)} → ${hm(connection.arrival?.time || connection.arrival)}</h3><p class="connection-summary">${durationText(connection.duration_minutes)}${transfers ? ` · ${transfers}` : ''}</p>${reliabilityHtml(connection)}</div><span class="price-pill">${price}</span></div><div class="timeline">${legs || '<p class="muted">Keine Teilstrecken verfügbar.</p>'}</div>${actionLinks(connection.offer_url, connection.manual_url)}</article>`;
+    const earlyDeparture = connection.early_departure_minutes
+      ? `<p class="departure-tolerance">${esc(connection.early_departure_minutes)} Minuten vor gewünschter Zeit</p>`
+      : '';
+    return `<article class="result-card connection-card"><div class="card-head"><div><div class="connection-labels">${labels}</div><h3>${hm(connection.departure?.time || connection.departure)} → ${hm(connection.arrival?.time || connection.arrival)}</h3><p class="connection-summary">${durationText(connection.duration_minutes)}${transfers ? ` · ${transfers}` : ''}</p>${earlyDeparture}${reliabilityHtml(connection)}</div><span class="price-pill">${price}</span></div><div class="timeline">${legs || '<p class="muted">Keine Teilstrecken verfügbar.</p>'}</div>${actionLinks(connection.offer_url, connection.manual_url)}<section class="coverage-panel" data-coverage-id="${coverageId}"><div class="coverage-heading"><strong>Mobilfunk entlang der Strecke</strong><span>Outdoor · 4G/5G</span></div><div class="coverage-content"><span class="coverage-loading"><i class="spinner"></i>Abdeckung wird unabhängig geladen …</span></div></section></article>`;
   }).join('');
   return `<section class="direction-group" data-direction="${esc(title)}"><div class="direction-heading"><div><span class="eyebrow">Bahn & Bus</span><h2>${esc(title)}</h2></div><span class="direction-count">${connections.length} ${connections.length === 1 ? 'Verbindung' : 'Verbindungen'}</span></div><div class="connection-list">${cards}</div></section>`;
 }
 
 function render(data) {
+  coverageGeneration += 1;
+  coverageQueue = [];
   const r = data.response_context || {};
   if (data.status === 'missing_fields') {
     showMessage(data.error || `Fehlende Angaben: ${(data.missing_fields || []).join(', ')}`, 'error');
@@ -384,6 +433,7 @@ function render(data) {
 
   $('results').innerHTML = html;
   $('results').className = 'results';
+  if (data.search_mode === 'ground_trip') loadCoverage();
 
   document.querySelectorAll('.feeder-card').forEach(card => {
     const views = JSON.parse(card.dataset.feeder || '{}');

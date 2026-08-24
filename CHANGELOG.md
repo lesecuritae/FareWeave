@@ -1,4 +1,15 @@
 # Changelog
+## 0.1.0 - 2026-08-24
+
+- Der Coverage Analyzer bewertet nach jeder Bodenreise mobiles Breitband (4G oder 5G) entlang des Streckenverlaufs für Fern-/Regionalbahn, FlixTrain, FlixBus und internationale Partnerverbindungen.
+- `coverage/provider.py`, `mapper.py`, `analyzer.py` und `cache.py` kapseln die asynchron nachgeladene, nicht blockierende Analyse.
+- Vorhandene Geometrien werden bevorzugt; Flix-GTFS-Shapes und koordinierte Zwischenhalte werden übernommen, sonst werden Haltepunkte über Transitous aufgelöst und mit gekennzeichneter Näherung interpoliert.
+- Ein Route-Hash und der bestehende SQLite/WAL-Cache speichern erfolgreiche Ergebnisse sieben Tage; Fehler werden nicht gecacht.
+- Quelle ist der offen lizenzierte CSV-Datensatz des Mobilfunk-Monitorings. Angezeigt wird die konservative Streckenquote mit mindestens einem, zwei oder drei Netzen; lokale Betreiberidentitäten werden nicht erfunden.
+- Ein konfigurierbares Abfahrtsvorfenster (`SEARCH_DEPARTURE_TOLERANCE_MINUTES`, Standard 15 Minuten) berücksichtigt knappe Frühabfahrten, kennzeichnet sie sichtbar und sichert den internationalen LE-232-Fall ab.
+- Ein gemeinsamer, kontextabhängiger Ortsresolver priorisiert exakte Stationsnamen und Unicode-Schreibweisen; internationale Stadtaliase greifen erst als Fallback und Flughafen-Aliase nur bei Flughafen-Kontext.
+- Deutsche/englische GTFS-Ortszuordnungen und internationale Verbindungen bleiben regressionsgetestet.
+
 ## 0.0.6 - 2026-08-24
 
 - Die nicht mehr nutzbare externe Unterkunftsschnittstelle wurde vollständig aus Laufzeitcode, Merge-Logik, Oberfläche, Docker-Konfiguration, Beispielumgebung, Dokumentation und Tests entfernt.

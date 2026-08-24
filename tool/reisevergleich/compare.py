@@ -4,7 +4,7 @@ import asyncio
 from datetime import date, datetime, timedelta
 from typing import Any
 
-from .config import HISTORY_ENRICH_TIMEOUT, today_iso
+from .config import HISTORY_ENRICH_TIMEOUT, SEARCH_DEPARTURE_TOLERANCE_MINUTES, today_iso
 from .db import build_manual_db_links, compact_attempts, compact_route, rank_routes
 from .ground_connections import connection_signature
 from .flix_connections import complete_flix_routes
@@ -12,7 +12,7 @@ from .models import DeutschlandticketRequest, ReiseRequest
 from .provider_cache import db_search_with_retry, db_split_analysis, flix_search, transitous_search
 from .ground_mixed import ground_mixed_options
 from .history import enrich_routes_history
-from .utils import as_float, as_int, parse_datetime, route_departure_in_window
+from .utils import annotate_departure_tolerance, as_float, as_int, departure_search_floor, parse_datetime, route_departure_in_window
 from .progress import update as progress
 
 _route_departure_in_window = route_departure_in_window
@@ -87,19 +87,21 @@ def _compact_split(split: dict[str, Any]) -> dict[str, Any]:
 async def compare_trip(request: ReiseRequest) -> dict[str, Any]:
     for step in ("db", "transitous", "gtfs", "flixbus", "flixtrain"):
         progress(step, "loading")
+    provider_date, provider_time = departure_search_floor(request.travel_date, request.departure_after)
+    provider_request = request.model_copy(update={"travel_date": provider_date, "departure_after": provider_time})
     db_task = asyncio.create_task(db_search_with_retry(
         origin=request.origin,
         destination=request.destination,
-        travel_date=request.travel_date,
-        departure_after=request.departure_after,
+        travel_date=provider_date,
+        departure_after=provider_time,
         mode="all",
         max_transfers=request.max_transfers,
         results=request.max_results,
     ))
     # Fallbacks parallel starten: Wenn DBnav/DB langsam ist, ist Transitous bereits
     # unterwegs. Flix läuft ebenfalls unabhängig und kann die Bahn nie blockieren.
-    transitous_task = asyncio.create_task(transitous_search(request))
-    flix_task = asyncio.create_task(flix_search(request))
+    transitous_task = asyncio.create_task(transitous_search(provider_request))
+    flix_task = asyncio.create_task(flix_search(provider_request))
 
     def provider_finished(step: str, task, routes_key: str, *, tuple_result: bool = False) -> None:
         try:
@@ -155,15 +157,28 @@ async def compare_trip(request: ReiseRequest) -> dict[str, Any]:
     db_routes = db_result.get("journeys") or []
     db_source = db_result.get("source")
     transitous_diagnostic = transitous_result.get("diagnostic")
-    if not db_routes:
-        db_routes = transitous_result.get("routes") or []
-        if db_routes:
-            db_source = "transitous"
-
-    db_routes = [route for route in db_routes if route_departure_in_window(route, request.travel_date, request.departure_after)]
+    transitous_routes = transitous_result.get("routes") or []
+    if transitous_routes:
+        db_source = f"{db_source}+transitous" if db_routes and db_source else "transitous"
+    scheduled_routes = [*db_routes, *transitous_routes]
+    db_routes = [
+        annotate_departure_tolerance(route, request.travel_date, request.departure_after)
+        for route in scheduled_routes
+        if route_departure_in_window(
+            route, request.travel_date, request.departure_after,
+            tolerance_minutes=SEARCH_DEPARTURE_TOLERANCE_MINUTES,
+        )
+    ]
 
     flix_routes = flix_result.get("candidate_routes") or flix_result.get("routes") or []
-    flix_routes = [route for route in flix_routes if route_departure_in_window(route, request.travel_date, request.departure_after)]
+    flix_routes = [
+        annotate_departure_tolerance(route, request.travel_date, request.departure_after)
+        for route in flix_routes
+        if route_departure_in_window(
+            route, request.travel_date, request.departure_after,
+            tolerance_minutes=SEARCH_DEPARTURE_TOLERANCE_MINUTES,
+        )
+    ]
     flix_routes = await complete_flix_routes(flix_routes, request)
 
     # Historie ist eine unabhängige, rein additive Schicht. Fehler oder Timeouts

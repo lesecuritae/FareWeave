@@ -66,15 +66,20 @@ with tempfile.TemporaryDirectory() as temporary:
             {"route_id": "B", "agency_id": "FLIXBUS-eu", "route_short_name": "N1", "route_long_name": "Bus", "route_type": "3"},
             {"route_id": "T", "agency_id": "FLIXTRAIN-eu", "route_short_name": "FLX1", "route_long_name": "Train", "route_type": "2"},
         ]),
-        "trips.txt": csv_bytes(["route_id", "service_id", "trip_id"], [
-            {"route_id": "B", "service_id": "regular", "trip_id": "bus"},
-            {"route_id": "T", "service_id": "added", "trip_id": "train"},
-            {"route_id": "B", "service_id": "removed", "trip_id": "removed"},
-            {"route_id": "B", "service_id": "night", "trip_id": "night"},
+        "trips.txt": csv_bytes(["route_id", "service_id", "trip_id", "shape_id"], [
+            {"route_id": "B", "service_id": "regular", "trip_id": "bus", "shape_id": "path"},
+            {"route_id": "T", "service_id": "added", "trip_id": "train", "shape_id": "path"},
+            {"route_id": "B", "service_id": "removed", "trip_id": "removed", "shape_id": "path"},
+            {"route_id": "B", "service_id": "night", "trip_id": "night", "shape_id": "path"},
         ]),
-        "stops.txt": csv_bytes(["stop_id", "stop_name", "parent_station", "stop_timezone"], [
-            {"stop_id": "L", "stop_name": "Leipzig central train station", "parent_station": "", "stop_timezone": "Europe/Berlin"},
-            {"stop_id": "D", "stop_name": "Dortmund Central Station", "parent_station": "", "stop_timezone": "Europe/Berlin"},
+        "stops.txt": csv_bytes(["stop_id", "stop_name", "parent_station", "stop_timezone", "stop_lat", "stop_lon"], [
+            {"stop_id": "L", "stop_name": "Leipzig central train station", "parent_station": "", "stop_timezone": "Europe/Berlin", "stop_lat": "51.345", "stop_lon": "12.381"},
+            {"stop_id": "D", "stop_name": "Dortmund Central Station", "parent_station": "", "stop_timezone": "Europe/Berlin", "stop_lat": "51.518", "stop_lon": "7.459"},
+        ]),
+        "shapes.txt": csv_bytes(["shape_id", "shape_pt_lat", "shape_pt_lon", "shape_pt_sequence"], [
+            {"shape_id": "path", "shape_pt_lat": "51.345", "shape_pt_lon": "12.381", "shape_pt_sequence": "1"},
+            {"shape_id": "path", "shape_pt_lat": "51.2", "shape_pt_lon": "10.0", "shape_pt_sequence": "2"},
+            {"shape_id": "path", "shape_pt_lat": "51.518", "shape_pt_lon": "7.459", "shape_pt_sequence": "3"},
         ]),
         "stop_times.txt": csv_bytes(["trip_id", "arrival_time", "departure_time", "stop_id", "stop_sequence"], [
             {"trip_id": trip, "arrival_time": dep, "departure_time": dep, "stop_id": "L", "stop_sequence": "1"}
@@ -99,6 +104,8 @@ with tempfile.TemporaryDirectory() as temporary:
     result = _search_sync(database, request)
     assert len(result["routes"]) == 3, result
     assert {route["provider"] for route in result["routes"]} == {"FlixBus", "FlixTrain"}, result
+    assert all(len(route.get("geometry", {}).get("coordinates", [])) == 3 for route in result["routes"]), result
+    assert all(len(route["legs"][0].get("stopovers", [])) == 2 for route in result["routes"]), result
     assert any(route["departure"].startswith("2026-08-25T02:15") for route in result["routes"]), result
     assert all(route["price"] is None and route["deutschlandticket_covered"] is False for route in result["routes"])
     request.departure_after = "17:00"
@@ -128,8 +135,10 @@ async def fresh_feed_does_not_wait_for_refresh_lock():
         database.touch()
         old_directory = gtfs_flix.FLIX_GTFS_DIR
         old_max_age = gtfs_flix.FLIX_GTFS_MAX_AGE
+        old_current = gtfs_flix._database_current
         gtfs_flix.FLIX_GTFS_DIR = temporary
         gtfs_flix.FLIX_GTFS_MAX_AGE = 3600
+        gtfs_flix._database_current = lambda _database: True
         try:
             await gtfs_flix._lock.acquire()
             try:
@@ -140,6 +149,7 @@ async def fresh_feed_does_not_wait_for_refresh_lock():
         finally:
             gtfs_flix.FLIX_GTFS_DIR = old_directory
             gtfs_flix.FLIX_GTFS_MAX_AGE = old_max_age
+            gtfs_flix._database_current = old_current
 
 
 asyncio.run(fresh_feed_does_not_wait_for_refresh_lock())

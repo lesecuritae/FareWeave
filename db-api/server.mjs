@@ -7,7 +7,7 @@ import {profile as dbProfile} from './vendor/p/db/index.js';
 import {profile as dbnavProfile} from './vendor/p/dbnav/index.js';
 
 const PORT = Number.parseInt(process.env.PORT || '3001', 10);
-const USER_AGENT = process.env.USER_AGENT || 'fareweave/0.0.6';
+const USER_AGENT = process.env.USER_AGENT || 'fareweave/0.1.0';
 const REQUEST_TIMEOUT_MS = Number.parseInt(process.env.DB_REQUEST_TIMEOUT_MS || '20000', 10);
 const SPLIT_TIMEOUT_MS = Number.parseInt(process.env.DB_SPLIT_TIMEOUT_MS || '75000', 10);
 const SPLIT_REQUEST_TIMEOUT_MS = Number.parseInt(process.env.DB_SPLIT_REQUEST_TIMEOUT_MS || '15000', 10);
@@ -604,6 +604,8 @@ function normalizeStopover(stopover) {
     arrival: isoValue(plannedArrival(stopover)),
     departure: isoValue(plannedDeparture(stopover)),
     platform: stopover?.plannedArrivalPlatform || stopover?.arrivalPlatform || stopover?.plannedDeparturePlatform || stopover?.departurePlatform || null,
+    latitude: Number.isFinite(Number(stop?.location?.latitude)) ? Number(stop.location.latitude) : null,
+    longitude: Number.isFinite(Number(stop?.location?.longitude)) ? Number(stop.location.longitude) : null,
   };
 }
 

@@ -7,6 +7,8 @@ from pathlib import Path
 from datetime import datetime, timedelta
 from typing import Any
 
+from .location_resolver import has_airport_context
+
 AIRPORT_STATIONS = {
     "BER": "Flughafen BER - Terminal 1-2",
     "LEJ": "Leipzig/Halle Flughafen",
@@ -288,6 +290,16 @@ def airport_identity_matches(requested_station: str | None, candidate_station: s
 
 def provider_location_query(value: str | None) -> str:
     text = str(value or "").strip()
+    normalized = re.sub(r"[^a-z0-9äöüß]+", " ", text.casefold()).strip()
+    canonical_airport_station = any(
+        normalized == re.sub(r"[^a-z0-9äöüß]+", " ", station.casefold()).strip()
+        for station in AIRPORT_STATIONS.values()
+    )
+    # City aliases such as "Leipzig" and "Frankfurt" are useful only when the
+    # request actually expresses airport intent.  Applying them to every public
+    # transport search silently turns central stations into airports.
+    if not (has_airport_context(text) or canonical_airport_station):
+        return text
     code = airport_from_station(text)
     return AIRPORT_PROVIDER_QUERIES.get(code, text)
 

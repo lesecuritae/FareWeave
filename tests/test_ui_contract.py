@@ -5,6 +5,8 @@ html = (root / "index.html").read_text(encoding="utf-8")
 js = (root / "app.js").read_text(encoding="utf-8")
 css = (root / "styles.css").read_text(encoding="utf-8")
 assert "FareWeave" in html
+assert '<script src="/assets/app.js" defer></script>' in html
+assert "/static/app.js" not in html
 assert bytes.fromhex("52656973656b6c6172").decode() not in html
 for needle in [
     "Bahn &amp; Bus",
@@ -46,6 +48,13 @@ for needle in [
     "Misch- & Split-Tickets",
     "include_feeder: state.travelMode === 'flight'",
     "travel_mode: state.travelMode === 'ground' ? 'ground' : 'flight'",
+    "function coverageResultHtml(",
+    "async function loadCoverage()",
+    "Math.min(3, queue.length)",
+    "coverageGeneration += 1",
+    "Mobilfunk entlang der Strecke",
+    "/api/coverage",
+    "Minuten vor gewünschter Zeit",
 ]:
     assert needle in js
 assert "state.hotelType === 'hotel' || state.hotelType === 'resort'" in js

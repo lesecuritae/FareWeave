@@ -12,10 +12,10 @@ def _env_bool(name: str, default: bool) -> bool:
     if value is None:
         return default
     return value.strip().lower() in {"1", "true", "yes", "on"}
-APP_VERSION = "0.0.6"
+APP_VERSION = "0.1.0"
 DB_API_URL = os.getenv("DB_API_URL", "http://db-api:3001").rstrip("/")
 TRANSITOUS_URL = os.getenv("TRANSITOUS_URL", "https://api.transitous.org").rstrip("/")
-TRANSITOUS_USER_AGENT = os.getenv("TRANSITOUS_USER_AGENT", "fareweave/0.0.6")
+TRANSITOUS_USER_AGENT = os.getenv("TRANSITOUS_USER_AGENT", "fareweave/0.1.0")
 TRVL_BIN = os.getenv("TRVL_BIN", "trvl")
 FLIX_GTFS_URL = os.getenv("FLIX_GTFS_URL", "https://api.transitous.org/gtfs/eu_flixbus.gtfs.zip")
 FLIX_GTFS_DIR = os.getenv("FLIX_GTFS_DIR", "/var/lib/reisevergleich/flix-gtfs")
@@ -34,6 +34,7 @@ GROUND_PROVIDER_CONCURRENCY = min(max(int(os.getenv("GROUND_PROVIDER_CONCURRENCY
 TRANSFER_PROVIDER_TIMEOUT = min(max(int(os.getenv("TRANSFER_PROVIDER_TIMEOUT", "20")), 8), 35)
 TRANSFER_PROVIDER_CONCURRENCY = min(max(int(os.getenv("TRANSFER_PROVIDER_CONCURRENCY", "2")), 1), 3)
 TRANSITOUS_TIMEOUT = min(max(int(os.getenv("TRANSITOUS_TIMEOUT", "25")), 8), 40)
+SEARCH_DEPARTURE_TOLERANCE_MINUTES = min(max(int(os.getenv("SEARCH_DEPARTURE_TOLERANCE_MINUTES", "15")), 0), 60)
 DB_SEARCH_TIMEOUT = min(max(int(os.getenv("DB_SEARCH_TIMEOUT", "50")), 20), 75)
 DB_SPLIT_TIMEOUT = min(max(int(os.getenv("DB_SPLIT_TIMEOUT", "45")), 15), 70)
 TRIP_TIMEOUT = min(max(int(os.getenv("TRIP_TIMEOUT", "210")), 90), 360)

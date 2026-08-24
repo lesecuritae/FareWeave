@@ -10,7 +10,6 @@ import re
 import sqlite3
 import tempfile
 import time
-import unicodedata
 import zipfile
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
@@ -21,11 +20,23 @@ import httpx
 
 from .config import FLIX_GTFS_DIR, FLIX_GTFS_MAX_AGE, FLIX_GTFS_TIMEOUT, FLIX_GTFS_URL, TRANSITOUS_USER_AGENT, TZ
 from .db import rank_routes
+from .location_resolver import CITY_ALIASES, exact_location_key, has_airport_context, location_key
 from .utils import as_float, parse_datetime
 
 LOG = logging.getLogger(__name__)
 REQUIRED = {"agency.txt", "routes.txt", "trips.txt", "stops.txt", "stop_times.txt", "calendar.txt", "calendar_dates.txt"}
+GTFS_SCHEMA_VERSION = 2
+MAX_ROUTE_GEOMETRY_POINTS = 300
 _lock = asyncio.Lock()
+
+
+def _database_current(database: Path) -> bool:
+    try:
+        with sqlite3.connect(f"file:{database}?mode=ro", uri=True) as db:
+            row = db.execute("SELECT value FROM meta WHERE key='schema_version'").fetchone()
+        return bool(row and json.loads(row[0]) == GTFS_SCHEMA_VERSION)
+    except (OSError, sqlite3.Error, ValueError, TypeError):
+        return False
 
 
 def _fresh_database() -> Path | None:
@@ -37,7 +48,7 @@ def _fresh_database() -> Path | None:
     """
     database = Path(FLIX_GTFS_DIR) / "flix.sqlite3"
     try:
-        if database.is_file() and time.time() - database.stat().st_mtime < FLIX_GTFS_MAX_AGE:
+        if database.is_file() and _database_current(database) and time.time() - database.stat().st_mtime < FLIX_GTFS_MAX_AGE:
             return database
     except OSError:
         return None
@@ -78,44 +89,8 @@ def gtfs_local_datetime(service_day: date, seconds: int, agency_timezone: str | 
 # englischer Name dort existiert. "Rom" und "Turin" fehlen deshalb bewusst: "rom" ist im
 # Feed als eigenes Token vorhanden, "Turin" ist in beiden Sprachen identisch. "Zürich"
 # braucht nur die ASCII-Form, weil die Diakritika-Entfernung bereits "zurich" ergibt.
-CITY_ALIASES = {
-    "munchen": "munich", "muenchen": "munich",
-    "koln": "cologne", "koeln": "cologne",
-    "nurnberg": "nuremberg", "nuernberg": "nuremberg",
-    "hannover": "hanover",
-    "braunschweig": "brunswick",
-    "wien": "vienna",
-    "zuerich": "zurich",
-    "genf": "geneva",
-    "prag": "prague",
-    "warschau": "warsaw",
-    "krakau": "krakow",
-    "danzig": "gdansk",
-    "breslau": "wroclaw",
-    "posen": "poznan",
-    "mailand": "milan",
-    "florenz": "florence",
-    "venedig": "venice",
-    "neapel": "naples",
-    "genua": "genoa",
-    "brussel": "brussels", "bruessel": "brussels",
-    "antwerpen": "antwerp",
-    "kopenhagen": "copenhagen",
-    "lissabon": "lisbon",
-    "sevilla": "seville",
-    "athen": "athens",
-    "bukarest": "bucharest",
-    "saloniki": "thessaloniki",
-    "laibach": "ljubljana",
-    "agram": "zagreb",
-    "pressburg": "bratislava",
-}
-
-
 def _key(value: str) -> str:
-    text = unicodedata.normalize("NFKD", value.casefold())
-    text = "".join(char for char in text if not unicodedata.combining(char))
-    return " ".join(CITY_ALIASES.get(token, token) for token in re.findall(r"[a-z0-9]+", text))
+    return location_key(value)
 
 
 def _place_tokens(value: str) -> set[str]:
@@ -124,18 +99,23 @@ def _place_tokens(value: str) -> set[str]:
 
 
 def stop_score(query: str, name: str) -> int:
+    if exact_location_key(query) == exact_location_key(name):
+        return 110
     query_key, name_key = _key(query), _key(name)
     if not query_key or not name_key:
         return 0
+    airport_penalty = 20 if not has_airport_context(query) and has_airport_context(name) else 0
     if query_key == name_key:
-        return 100
+        return 100 - airport_penalty
     query_tokens, name_tokens = _place_tokens(query), _place_tokens(name)
     if query_tokens and query_tokens == name_tokens:
-        return 90
+        return 90 - airport_penalty
+    if name_key.startswith(query_key + " "):
+        return 80 - airport_penalty
     if query_tokens and query_tokens <= name_tokens:
-        return 75
+        return 75 - airport_penalty
     if query_key in name_key:
-        return 60
+        return 60 - airport_penalty
     return 0
 
 
@@ -169,17 +149,18 @@ def _build_database(zip_path: Path, database_path: Path, metadata: dict[str, Any
                 PRAGMA journal_mode=OFF; PRAGMA synchronous=OFF;
                 CREATE TABLE agency(agency_id TEXT PRIMARY KEY, name TEXT, timezone TEXT);
                 CREATE TABLE route(route_id TEXT PRIMARY KEY, agency_id TEXT, short_name TEXT, long_name TEXT, route_type INTEGER);
-                CREATE TABLE trip(trip_id TEXT PRIMARY KEY, route_id TEXT, service_id TEXT);
-                CREATE TABLE stop(stop_id TEXT PRIMARY KEY, name TEXT, parent_station TEXT, timezone TEXT);
+                CREATE TABLE trip(trip_id TEXT PRIMARY KEY, route_id TEXT, service_id TEXT, shape_id TEXT);
+                CREATE TABLE stop(stop_id TEXT PRIMARY KEY, name TEXT, parent_station TEXT, timezone TEXT, latitude REAL, longitude REAL);
                 CREATE TABLE stop_time(trip_id TEXT, stop_id TEXT, sequence INTEGER, arrival INTEGER, departure INTEGER);
+                CREATE TABLE shape(shape_id TEXT, sequence INTEGER, latitude REAL, longitude REAL);
                 CREATE TABLE calendar(service_id TEXT PRIMARY KEY, monday TEXT, tuesday TEXT, wednesday TEXT, thursday TEXT, friday TEXT, saturday TEXT, sunday TEXT, start_date TEXT, end_date TEXT);
                 CREATE TABLE exception(service_id TEXT, date TEXT, exception_type INTEGER, PRIMARY KEY(service_id,date));
                 CREATE TABLE meta(key TEXT PRIMARY KEY, value TEXT);
             """)
             db.executemany("INSERT INTO agency VALUES(?,?,?)", ((r.get("agency_id", ""), r.get("agency_name", ""), r.get("agency_timezone") or "UTC") for r in _rows(archive, "agency.txt")))
             db.executemany("INSERT INTO route VALUES(?,?,?,?,?)", ((r.get("route_id", ""), r.get("agency_id", ""), r.get("route_short_name", ""), r.get("route_long_name", ""), int(r.get("route_type") or -1)) for r in _rows(archive, "routes.txt")))
-            db.executemany("INSERT INTO trip VALUES(?,?,?)", ((r.get("trip_id", ""), r.get("route_id", ""), r.get("service_id", "")) for r in _rows(archive, "trips.txt")))
-            db.executemany("INSERT INTO stop VALUES(?,?,?,?)", ((r.get("stop_id", ""), r.get("stop_name", ""), r.get("parent_station", ""), r.get("stop_timezone", "")) for r in _rows(archive, "stops.txt")))
+            db.executemany("INSERT INTO trip VALUES(?,?,?,?)", ((r.get("trip_id", ""), r.get("route_id", ""), r.get("service_id", ""), r.get("shape_id", "")) for r in _rows(archive, "trips.txt")))
+            db.executemany("INSERT INTO stop VALUES(?,?,?,?,?,?)", ((r.get("stop_id", ""), r.get("stop_name", ""), r.get("parent_station", ""), r.get("stop_timezone", ""), float(r["stop_lat"]) if r.get("stop_lat") else None, float(r["stop_lon"]) if r.get("stop_lon") else None) for r in _rows(archive, "stops.txt")))
             stop_times = []
             for r in _rows(archive, "stop_times.txt"):
                 try:
@@ -189,11 +170,22 @@ def _build_database(zip_path: Path, database_path: Path, metadata: dict[str, Any
                 if len(stop_times) >= 25000:
                     db.executemany("INSERT INTO stop_time VALUES(?,?,?,?,?)", stop_times); stop_times.clear()
             db.executemany("INSERT INTO stop_time VALUES(?,?,?,?,?)", stop_times)
+            if "shapes.txt" in names:
+                shape_rows = []
+                for r in _rows(archive, "shapes.txt"):
+                    try:
+                        shape_rows.append((r["shape_id"], int(r["shape_pt_sequence"]), float(r["shape_pt_lat"]), float(r["shape_pt_lon"])))
+                    except (KeyError, TypeError, ValueError):
+                        continue
+                    if len(shape_rows) >= 25000:
+                        db.executemany("INSERT INTO shape VALUES(?,?,?,?)", shape_rows); shape_rows.clear()
+                db.executemany("INSERT INTO shape VALUES(?,?,?,?)", shape_rows)
             weekdays = ("monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday")
             db.executemany("INSERT OR REPLACE INTO calendar VALUES(?,?,?,?,?,?,?,?,?,?)", ((r.get("service_id", ""), *(r.get(day, "0") for day in weekdays), r.get("start_date", ""), r.get("end_date", "")) for r in _rows(archive, "calendar.txt")))
             db.executemany("INSERT OR REPLACE INTO exception VALUES(?,?,?)", ((r.get("service_id", ""), r.get("date", ""), int(r.get("exception_type") or 0)) for r in _rows(archive, "calendar_dates.txt")))
+            metadata["schema_version"] = GTFS_SCHEMA_VERSION
             db.executemany("INSERT INTO meta VALUES(?,?)", ((key, json.dumps(value)) for key, value in metadata.items()))
-            db.executescript("CREATE INDEX stop_time_stop ON stop_time(stop_id,trip_id,sequence); CREATE INDEX stop_time_trip ON stop_time(trip_id,sequence); CREATE INDEX trip_service ON trip(service_id); ANALYZE;")
+            db.executescript("CREATE INDEX stop_time_stop ON stop_time(stop_id,trip_id,sequence); CREATE INDEX stop_time_trip ON stop_time(trip_id,sequence); CREATE INDEX trip_service ON trip(service_id); CREATE INDEX shape_trip ON shape(shape_id,sequence); ANALYZE;")
             if db.execute("SELECT count(*) FROM stop_time").fetchone()[0] == 0:
                 raise ValueError("GTFS-Feed enthält keine gültigen stop_times")
 
@@ -201,11 +193,11 @@ def _build_database(zip_path: Path, database_path: Path, metadata: dict[str, Any
 def _refresh_sync(force: bool = False) -> Path:
     directory = Path(FLIX_GTFS_DIR); directory.mkdir(parents=True, exist_ok=True)
     database = directory / "flix.sqlite3"
-    if database.exists() and not force and time.time() - database.stat().st_mtime < FLIX_GTFS_MAX_AGE:
+    if database.exists() and not force and _database_current(database) and time.time() - database.stat().st_mtime < FLIX_GTFS_MAX_AGE:
         return database
     headers = {}
     meta_path = directory / "feed.json"
-    if meta_path.exists():
+    if meta_path.exists() and _database_current(database):
         try:
             previous = json.loads(meta_path.read_text())
             if previous.get("etag"): headers["If-None-Match"] = previous["etag"]
@@ -245,6 +237,58 @@ async def ensure_feed(force: bool = False) -> Path:
         return await asyncio.to_thread(_refresh_sync, force)
 
 
+def _downsample_coordinates(points: list[list[float]]) -> list[list[float]]:
+    if len(points) <= MAX_ROUTE_GEOMETRY_POINTS:
+        return points
+    step = (len(points) - 1) / (MAX_ROUTE_GEOMETRY_POINTS - 1)
+    return [points[round(index * step)] for index in range(MAX_ROUTE_GEOMETRY_POINTS)]
+
+
+def _attach_gtfs_path(database: Path, route: dict[str, Any]) -> None:
+    trip_id = str(route.get("_trip_id") or "")
+    origin_sequence = int(route.get("_origin_sequence") or 0)
+    destination_sequence = int(route.get("_destination_sequence") or 0)
+    if not trip_id or destination_sequence <= origin_sequence:
+        return
+    with sqlite3.connect(database) as db:
+        db.row_factory = sqlite3.Row
+        stops = list(db.execute(
+            """SELECT s.stop_id,s.name,s.latitude,s.longitude,st.sequence
+               FROM stop_time st JOIN stop s ON s.stop_id=st.stop_id
+               WHERE st.trip_id=? AND st.sequence BETWEEN ? AND ? ORDER BY st.sequence""",
+            (trip_id, origin_sequence, destination_sequence),
+        ))
+        shape_id = str(route.get("_shape_id") or "")
+        shapes = list(db.execute(
+            "SELECT latitude,longitude FROM shape WHERE shape_id=? ORDER BY sequence", (shape_id,),
+        )) if shape_id else []
+    stopovers = [
+        {
+            "name": row["name"],
+            "id": row["stop_id"],
+            "latitude": row["latitude"],
+            "longitude": row["longitude"],
+        }
+        for row in stops
+    ]
+    if route.get("legs") and stopovers:
+        route["legs"][0]["stopovers"] = stopovers
+    if len(shapes) < 2 or len(stops) < 2:
+        return
+    points = [[float(row["longitude"]), float(row["latitude"])] for row in shapes]
+
+    def nearest(stop: sqlite3.Row) -> int:
+        latitude, longitude = float(stop["latitude"]), float(stop["longitude"])
+        return min(range(len(points)), key=lambda index: (points[index][0] - longitude) ** 2 + (points[index][1] - latitude) ** 2)
+
+    if any(row["latitude"] is None or row["longitude"] is None for row in (stops[0], stops[-1])):
+        return
+    start, end = nearest(stops[0]), nearest(stops[-1])
+    segment = points[start:end + 1] if start <= end else list(reversed(points[end:start + 1]))
+    if len(segment) >= 2:
+        route["geometry"] = {"type": "LineString", "coordinates": _downsample_coordinates(segment)}
+
+
 def _search_sync(database: Path, request) -> dict[str, Any]:
     requested_day = date.fromisoformat(request.travel_date)
     requested_local = datetime.combine(requested_day, datetime.strptime(request.departure_after, "%H:%M").time(), tzinfo=TZ)
@@ -258,7 +302,7 @@ def _search_sync(database: Path, request) -> dict[str, Any]:
         if not origin_ids or not destination_ids:
             return {"status": "empty", "routes": [], "candidate_routes": [], "provider_status": {"provider": "flix-gtfs", "ok": True, "error": "Start oder Ziel nicht im Flix-GTFS gefunden"}}
         placeholders_o, placeholders_d = ",".join("?" * len(origin_ids)), ",".join("?" * len(destination_ids))
-        sql = f"""SELECT t.trip_id,t.service_id,r.route_id,r.agency_id,r.short_name,r.long_name,r.route_type,a.timezone,
+        sql = f"""SELECT t.trip_id,t.service_id,t.shape_id,r.route_id,r.agency_id,r.short_name,r.long_name,r.route_type,a.timezone,
           so.name origin_name,sd.name destination_name,o.departure departure_seconds,d.arrival arrival_seconds,o.sequence origin_sequence,d.sequence destination_sequence
           FROM stop_time o JOIN stop_time d ON d.trip_id=o.trip_id AND d.sequence>o.sequence
           JOIN trip t ON t.trip_id=o.trip_id JOIN route r ON r.route_id=t.route_id JOIN agency a ON a.agency_id=r.agency_id
@@ -290,8 +334,13 @@ def _search_sync(database: Path, request) -> dict[str, Any]:
         seen.add(fingerprint)
         provider = "FlixTrain" if kind == "train" else "FlixBus"
         line = row["short_name"] or provider
-        output.append({"id": f"gtfs-{row['trip_id']}-{row['origin_sequence']}-{day_key}", "provider": provider, "provider_code": "flix", "flix_kind": kind, "type": kind, "line": line, "origin": row["origin_name"], "destination": row["destination_name"], "departure": departure.isoformat(), "arrival": arrival.isoformat(), "duration_minutes": int((arrival-departure).total_seconds()//60), "transfers": 0, "price": None, "price_complete": False, "price_note": "Fahrplandaten aus GTFS; kein Live-Preis verfügbar.", "deutschlandticket_covered": False, "booking_url": "https://global.flixbus.com/", "legs": [{"provider": provider, "mode": kind, "line": line, "origin": row["origin_name"], "destination": row["destination_name"], "departure": departure.isoformat(), "arrival": arrival.isoformat()}], "gtfs_service_id": row["service_id"], "gtfs_route_id": row["route_id"]})
+        output.append({"id": f"gtfs-{row['trip_id']}-{row['origin_sequence']}-{day_key}", "provider": provider, "provider_code": "flix", "flix_kind": kind, "type": kind, "line": line, "origin": row["origin_name"], "destination": row["destination_name"], "departure": departure.isoformat(), "arrival": arrival.isoformat(), "duration_minutes": int((arrival-departure).total_seconds()//60), "transfers": 0, "price": None, "price_complete": False, "price_note": "Fahrplandaten aus GTFS; kein Live-Preis verfügbar.", "deutschlandticket_covered": False, "booking_url": "https://global.flixbus.com/", "legs": [{"provider": provider, "mode": kind, "line": line, "origin": row["origin_name"], "destination": row["destination_name"], "departure": departure.isoformat(), "arrival": arrival.isoformat()}], "gtfs_service_id": row["service_id"], "gtfs_route_id": row["route_id"], "_trip_id": row["trip_id"], "_shape_id": row["shape_id"], "_origin_sequence": row["origin_sequence"], "_destination_sequence": row["destination_sequence"]})
     ranked = sorted(output, key=lambda route: (route["departure"], route["arrival"], route["provider"]))
+    for route in ranked[:request.max_results]:
+        _attach_gtfs_path(database, route)
+    for route in ranked:
+        for key in ("_trip_id", "_shape_id", "_origin_sequence", "_destination_sequence"):
+            route.pop(key, None)
     return {"status": "ok" if ranked else "empty", "routes": ranked[:request.max_results], "candidate_routes": ranked, "candidate_counts": {"train": sum(r["flix_kind"]=="train" for r in ranked), "bus": sum(r["flix_kind"]=="bus" for r in ranked), "mixed": 0}, "provider_status": {"provider": "flix-gtfs", "ok": True, "route_count": len(ranked)}, "error": None}
 
 

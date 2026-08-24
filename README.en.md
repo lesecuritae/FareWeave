@@ -8,7 +8,7 @@
 
 Rail, the Deutschlandticket, split tickets, FlixTrain, FlixBus, flights, airport feeders, transfers, and accommodation are combined into a single itinerary. FareWeave does not merely look for a low price somewhere. Every part of the journey must fit together both chronologically and logically.
 
-Current version: **0.0.6**
+Current version: **0.1.0**
 
 FareWeave does not sell or book anything itself. If a provider supplies a usable offer link, it can be opened directly from the result. Where no direct link is available, FareWeave offers a suitable manual cross-check, for example with Deutsche Bahn, Google Flights, Google Hotels, or Google Maps. Price and availability must always be verified with the actual provider.
 
@@ -98,11 +98,11 @@ trvl supplies data in selected places. FareWeave then applies deterministic rule
 
 Flight providers are queried separately and have their own time limits. A slow or broken provider must not block the entire journey plan.
 
-FareWeave 0.0.6 first queries **Skiplagged, Ryanair, Vueling, and easyJet**. If those results are insufficient, it continues with **Transavia, Norwegian, Air France/KLM, and Wizz Air**.
+FareWeave 0.1.0 first queries **Skiplagged, Ryanair, Vueling, and easyJet**. If those results are insufficient, it continues with **Transavia, Norwegian, Air France/KLM, and Wizz Air**.
 
 The aggregated trvl request is not passed through without limits. FareWeave queries the required providers in isolation, combines usable results, and rejects chronologically implausible flights.
 
-Google Flights is also included as a manual cross-check. In FareWeave 0.0.6 it is **not a separate automated Google Flights provider**, but a suitable search link for the requested route and travel dates.
+Google Flights is also included as a manual cross-check. In FareWeave 0.1.0 it is **not a separate automated Google Flights provider**, but a suitable search link for the requested route and travel dates.
 
 ## Transfers and public transport
 
@@ -353,7 +353,17 @@ docker compose build
 docker compose up -d
 ```
 
-trvl is pinned through `TRVL_REF`; FareWeave 0.0.6 uses `v1.21.4` by default.
+trvl is pinned through `TRVL_REF`; FareWeave 0.1.0 uses `v1.21.4` by default.
+
+## Mobile coverage along a journey
+
+For ground journeys, FareWeave loads a separate coverage analysis for each visible connection after the journey response has rendered. This is transport-neutral and covers DB long-distance and regional rail, FlixTrain, FlixBus, and international partner services. The openly licensed 100 m mobile-monitoring CSV grid is used to conservatively calculate the route share with at least one, two, or three broadband networks (4G or 5G). The public grid does not identify local operators, so FareWeave does not invent individual Telekom, Vodafone, Telefónica/O2, or 1&1 values. Successful analyses are stored for seven days in the existing SQLite cache under a stable route hash.
+
+The values are outdoor predictions on a 100×100 m grid, not a guarantee of reception or throughput inside a vehicle. Existing geometry and Flix GTFS shapes take precedence, followed by coordinated intermediate stops and finally a clearly labelled straight-line approximation. The source does not identify tunnels separately. Coverage-analysis failures never change or delay journey results.
+
+Journey searches include connections departing up to 15 minutes before the requested time by default. Such departures are explicitly labelled as “x minutes before the requested time”. The window is configured centrally through `SEARCH_DEPARTURE_TOLERANCE_MINUTES`; the user's input itself remains unchanged.
+
+Location resolution for DB, Transitous and Flix always tries the unchanged station name first. Controlled international spellings such as München/Muenchen/Munich, Köln/Cologne or Wien/Vienna are used only after an empty exact lookup. Airport aliases require explicit airport context (for example “Airport”, “Flughafen” or an IATA code); TRVL airport transfers retain the same separation.
 
 ## Quality assurance
 

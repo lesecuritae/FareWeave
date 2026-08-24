@@ -137,7 +137,7 @@ def _set_component_sync(namespace: str, key_data: Any, value: Any, ttl: int) -> 
 def _cacheable_component(value: Any) -> bool:
     return not (
         isinstance(value, dict)
-        and value.get("status") in {"failed", "manual_required", "partial"}
+        and value.get("status") in {"failed", "manual_required", "partial", "unavailable"}
     )
 
 

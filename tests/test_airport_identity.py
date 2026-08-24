@@ -1,5 +1,6 @@
 from datetime import datetime
 
+from reisevergleich.airports import provider_location_query
 from reisevergleich.feeder_common import valid_feeder_options
 from reisevergleich.transitous import choose_match
 
@@ -47,6 +48,13 @@ def check_transitous_generic_airport_uses_city_tokens() -> None:
     assert selected and selected.get("id") == "right", selected
 
 
+def test_station_and_airport_queries_stay_separate() -> None:
+    assert provider_location_query("Leipzig Hbf") == "Leipzig Hbf"
+    assert provider_location_query("Frankfurt(Main) Hbf") == "Frankfurt(Main) Hbf"
+    assert provider_location_query("Leipzig Flughafen") == "Leipzig Halle Flughafen"
+    assert provider_location_query("Frankfurt Airport") == "Frankfurt Flughafen"
+
+
 def check_final_feeder_guard_rejects_wrong_airport() -> None:
     lower = datetime.fromisoformat('2030-09-15T06:00:00+02:00')
     cutoff = datetime.fromisoformat('2030-09-15T11:45:00+02:00')
@@ -70,6 +78,7 @@ def main() -> None:
         ('Transitous bevorzugt BER vor Frankfurt', check_transitous_prefers_right_airport),
         ('Transitous verwirft Frankfurt/Köln bei BER-Anfrage', check_transitous_rejects_wrong_airport_only),
         ("Transitous wählt internationalen Flughafen nach Stadtidentität", check_transitous_generic_airport_uses_city_tokens),
+        ("Bahnhof- und Flughafen-Suchintention bleiben getrennt", test_station_and_airport_queries_stay_separate),
         ('Letzter Zubringer-Guard verwirft falschen Flughafen', check_final_feeder_guard_rejects_wrong_airport),
     ]
     failures=[]

@@ -8,7 +8,7 @@
 
 Bahn, Deutschlandticket, Split-Tickets, FlixTrain, FlixBus, Flüge, Flughafenzubringer, Transfers und Unterkünfte landen in einer gemeinsamen Planung. FareWeave schaut dabei nicht nur, ob irgendwo ein günstiger Preis auftaucht. Die einzelnen Teile müssen zeitlich und logisch zusammenpassen.
 
-Aktuelle Version: **0.0.6**
+Aktuelle Version: **0.1.0**
 
 FareWeave verkauft und bucht selbst nichts. Wenn ein Provider einen brauchbaren Angebotslink liefert, kann er direkt aus dem Ergebnis geöffnet werden. Wo kein direkter Link vorhanden ist, gibt es an passenden Stellen einen manuellen Gegencheck, etwa bei der Deutschen Bahn, Google Flights, Google Hotels oder Google Maps. Preis und Verfügbarkeit werden beim eigentlichen Anbieter noch einmal geprüft.
 
@@ -98,11 +98,11 @@ trvl liefert an ausgewählten Stellen Daten. FareWeave entscheidet anschließend
 
 Die Flugabfragen laufen bewusst providerweise und mit eigenen Zeitlimits. Ein langsamer oder kaputter Provider soll nicht die komplette Reiseplanung blockieren.
 
-In FareWeave 0.0.6 werden zuerst **Skiplagged, Ryanair, Vueling und easyJet** abgefragt. Reichen die Ergebnisse nicht aus, folgen **Transavia, Norwegian, Air France/KLM und Wizz Air**.
+In FareWeave 0.1.0 werden zuerst **Skiplagged, Ryanair, Vueling und easyJet** abgefragt. Reichen die Ergebnisse nicht aus, folgen **Transavia, Norwegian, Air France/KLM und Wizz Air**.
 
 Die trvl-Sammelabfrage wird dafür nicht einfach unbeschränkt durchgereicht. FareWeave fragt die benötigten Provider isoliert ab, führt brauchbare Ergebnisse zusammen und verwirft chronologisch unplausible Flüge.
 
-Google Flights ist zusätzlich als manueller Gegencheck eingebaut. Es handelt sich in FareWeave 0.0.6 dabei **nicht um einen eigenen automatischen Google-Flights-Provider**, sondern um einen passenden Suchlink für die betreffende Strecke und die gewählten Reisedaten.
+Google Flights ist zusätzlich als manueller Gegencheck eingebaut. Es handelt sich in FareWeave 0.1.0 dabei **nicht um einen eigenen automatischen Google-Flights-Provider**, sondern um einen passenden Suchlink für die betreffende Strecke und die gewählten Reisedaten.
 
 ## Transfers und öffentlicher Verkehr
 
@@ -355,7 +355,17 @@ docker compose build
 docker compose up -d
 ```
 
-trvl ist über `TRVL_REF` gepinnt; FareWeave 0.0.6 verwendet standardmäßig `v1.21.4`.
+trvl ist über `TRVL_REF` gepinnt; FareWeave 0.1.0 verwendet standardmäßig `v1.21.4`.
+
+## Mobilfunkabdeckung entlang der Fahrt
+
+Bei Bodenreisen lädt FareWeave nach der eigentlichen Reiseantwort automatisch eine separate Abdeckungsanalyse je sichtbarer Verbindung. Das gilt verkehrsmittelneutral für DB-Fernverkehr, Regionalbahn, FlixTrain, FlixBus und internationale Partnerverbindungen. Aus dem offen lizenzierten 100-m-CSV-Raster des Mobilfunk-Monitorings wird konservativ berechnet, auf welchem Streckenanteil mindestens ein, zwei oder drei breitbandige Netze (4G oder 5G) verfügbar sind. Die öffentlichen Rasterdaten nennen lokal keine Betreiberidentitäten; FareWeave weist deshalb Telekom, Vodafone, Telefónica/O2 oder 1&1 keine erfundenen Einzelwerte zu. Erfolgreiche Auswertungen werden anhand eines Route-Hashs sieben Tage im bestehenden SQLite-Cache gespeichert.
+
+Die Werte sind Outdoor-Prognosen im 100×100-m-Raster, keine Garantie für Empfang oder Datenrate im Fahrzeug. Vorhandene Geometrien und Flix-GTFS-Shapes werden bevorzugt; danach folgen koordinierte Zwischenhalte und erst zuletzt eine gerade Näherung. Tunnel werden von der Quelle nicht separat ausgewiesen. Fehler der Abdeckungsanalyse verändern oder verzögern die Reiseergebnisse nicht.
+
+Die Reisesuche berücksichtigt standardmäßig Verbindungen bis zu 15 Minuten vor der gewünschten Abfahrtszeit. Eine solche Abfahrt wird im Ergebnis ausdrücklich als „x Minuten vor gewünschter Zeit“ markiert. Das Fenster ist zentral über `SEARCH_DEPARTURE_TOLERANCE_MINUTES` konfigurierbar; die Nutzereingabe selbst bleibt unverändert.
+
+Die Ortsauflösung prüft bei DB, Transitous und Flix immer zuerst den unveränderten Stationsnamen. Erst bei einem leeren Exakttreffer folgen kontrollierte internationale Varianten wie München/Muenchen/Munich, Köln/Cologne oder Wien/Vienna. Flughafen-Aliase werden ausschließlich bei erkennbarem Flughafen-Kontext (etwa „Airport“, „Flughafen“ oder IATA-Code) eingesetzt; dieselbe Trennung bleibt in den TRVL-Airport-Transfers erhalten.
 
 ## Qualitätssicherung
 

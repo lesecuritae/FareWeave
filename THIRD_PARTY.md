@@ -1,5 +1,16 @@
 # Drittanbieter
 
+## Bundesnetzagentur Mobilfunk-Monitoring
+
+FareWeave verwendet ausschließlich den ausdrücklich weiterverarbeitbaren CSV-Datensatz `202601_MobilfunkMonitoring.csv` (Datenstand Dezember 2025), nicht die anbieterspezifischen Web-Kacheln. Daraus wird ein kompakter 100-m-Rasterindex abgeleitet. Die Daten beschreiben prognostizierte Outdoor-Versorgung und nennen je Technologie die Zahl versorgender Netze, aber keine lokale Betreiberidentität. FareWeave zeigt deshalb nur konservative Mindestanzahlen und kein erfundenes Betreiber-Ranking.
+
+- Datensatz: https://data.bundesnetzagentur.de/Bundesnetzagentur/GIGA/DE/MobilfunkMonitoring/2512/202601_MobilfunkMonitoring.zip
+- Lizenz: Datenlizenz Deutschland – Namensnennung – Version 2.0
+- Quellenvermerk: © Bundesnetzagentur; Rasterbasis © GeoBasis-DE / BKG (2025)
+- Methodik: https://gigabitgrundbuch.bund.de/GIGA/DE/MobilfunkMonitoring/start.html
+- Rechtliche Hinweise: https://gigabitgrundbuch.bund.de/GIGA/DE/Impressum/start.html
+- Datenursprung: Netzbetreiberangaben mit Plausibilitätsprüfung durch die Bundesnetzagentur
+
 FareWeave lädt die beiden großen Transportbibliotheken beim Container-Build aus ihren jeweiligen Upstream-Repositories. Die folgenden Lizenzbedingungen gelten unabhängig von der FareWeave-Projektlizenz.
 
 ## trvl

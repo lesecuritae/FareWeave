@@ -348,3 +348,9 @@ class TripRequest(BaseModel):
         if self.feeder_preference == "dticket_first":
             return "cheapest"
         return self.feeder_preference
+
+
+class CoverageRequest(BaseModel):
+    """Provider-neutral route snapshot used by the optional coverage analyzer."""
+
+    route: dict[str, Any]

@@ -7,6 +7,9 @@ from reisevergleich.models import TripRequest
 
 ops = {route.operation_id for route in router.routes if getattr(route, "operation_id", None)}
 assert "search_trip" in ops
+coverage_routes = [route for route in router.routes if getattr(route, "path", None) == "/api/coverage"]
+assert len(coverage_routes) == 1
+assert coverage_routes[0].methods == {"POST"}
 assert all("reise_assistent" not in str(x).casefold() for x in ops)
 fields = set(TripRequest.model_fields)
 for required in {"origin","destination","departure_date","deutschlandticket","deutschlandticket_only","duration_value","duration_unit","return_date","hotel_min_stars"}:
@@ -25,3 +28,4 @@ assert "frame-ancestors 'none'" in source
 assert "object-src 'none'" in source
 assert "lifespan=lifespan" in source
 assert "start_scheduler()" in source and "await stop_scheduler(scheduler)" in source
+assert 'app.mount("/assets", StaticFiles(directory=UI), name="assets")' in source

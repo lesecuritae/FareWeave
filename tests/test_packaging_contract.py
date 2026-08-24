@@ -1,4 +1,5 @@
 from pathlib import Path
+import hashlib
 import os
 
 root = Path(os.environ.get("SOURCE_ROOT", Path(__file__).resolve().parents[1]))
@@ -13,6 +14,7 @@ app_dockerfile = (root / "tool" / "Dockerfile").read_text(encoding="utf-8")
 db_api_dockerfile = (root / "db-api" / "Dockerfile").read_text(encoding="utf-8")
 db_api_server = (root / "db-api" / "server.mjs").read_text(encoding="utf-8")
 pyproject = (root / "pyproject.toml").read_text(encoding="utf-8")
+runtime_requirements = (root / "tool" / "requirements.txt").read_text(encoding="utf-8")
 installer = root / "install.sh"
 installer_text = installer.read_text(encoding="utf-8")
 license_file = root / "LICENSE"
@@ -36,9 +38,17 @@ assert "ghcr.io/lesecuritae/fareweave-db-api:latest" in compose
 assert "condition: service_healthy" in compose
 assert 'HISTORY_SNAPSHOT_SCHEDULER_ENABLED: "${HISTORY_SNAPSHOT_SCHEDULER_ENABLED:-true}"' in compose
 assert 'HISTORY_SNAPSHOT_INTERVAL_SECONDS: "${HISTORY_SNAPSHOT_INTERVAL_SECONDS:-86400}"' in compose
+assert 'SEARCH_DEPARTURE_TOLERANCE_MINUTES: "${SEARCH_DEPARTURE_TOLERANCE_MINUTES:-15}"' in compose
 assert "HEALTHCHECK" in app_dockerfile and "/api/health" in app_dockerfile
 assert "HEALTHCHECK" in db_api_dockerfile and "/health" in db_api_dockerfile
-assert "fareweave/0.0.6" in db_api_server and "fareweave/0.0.5" not in db_api_server
+assert "fareweave/0.1.0" in db_api_server and "fareweave/0.0.6" not in db_api_server
+assert 'version = "0.1.0"' in pyproject
+assert "Pillow" not in runtime_requirements
+for coverage_file in ("provider.py", "mapper.py", "analyzer.py", "cache.py"):
+    assert (root / "tool" / "reisevergleich" / "coverage" / coverage_file).is_file()
+coverage_data = root / "tool" / "reisevergleich" / "coverage" / "data" / "mobile_broadband_2025_12.fwcov"
+assert coverage_data.stat().st_size > 1_000_000
+assert hashlib.sha256(coverage_data.read_bytes()).hexdigest() == "25330fedbd820a4ee6064aaeb2c4dabf621f10ab6b9df4feaad5c0a8e978b0c6"
 assert 'name = "fareweave"' in pyproject and 'testpaths = ["tests"]' in pyproject
 test_requirements = (root / "tool" / "requirements-test.txt").read_text(encoding="utf-8")
 assert "-r requirements.txt" in test_requirements
@@ -50,6 +60,9 @@ assert "docker compose up -d --no-build" in readme_de and "docker compose up -d 
 assert "PolyForm Noncommercial License 1.0.0" in third_party
 assert "Required Notice" in third_party
 assert "ISC License" in third_party
+assert "Bundesnetzagentur Mobilfunk-Monitoring" in third_party
+assert "Mobilfunkabdeckung entlang der Fahrt" in readme_de
+assert "Mobile coverage along a journey" in readme_en
 assert "curl_cffi" in check.split('if python3 -c', 1)[1].split('then', 1)[0]
 assert '-v "$ROOT:/source:ro"' in container_check
 assert 'export DB_CFFI_TOKEN="${DB_CFFI_TOKEN:-' in container_check, (
