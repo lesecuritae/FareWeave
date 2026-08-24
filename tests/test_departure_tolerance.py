@@ -105,3 +105,11 @@ def test_compare_queries_all_ground_providers_with_floor_and_keeps_le(monkeypatc
     assert early["early_departure_minutes"] == 6
     assert early["legs"][0]["operator"] == "LEO Express"
     assert any(item["id"] == "db-later" for item in result["visible_options"])
+    states = {item["provider"]: item["outcome"] for item in result["provider_statuses"]}
+    assert states == {"DB": "connection_found", "Transitous": "connection_found", "Flix": "no_connection"}
+
+
+def test_provider_states_distinguish_empty_and_failure():
+    assert compare._provider_state("Flix", ok=True)["outcome"] == "no_connection"
+    assert compare._provider_state("Flix", ok=False)["message"] == "Technischer Abruffehler"
+    assert compare._provider_state("DB", ok=True, result_count=1)["outcome"] == "connection_found"

@@ -146,7 +146,9 @@ async def search(request: ReiseRequest, *, deutschlandticket_only: bool = False)
                 deutschlandticket_only=deutschlandticket_only,
             )[: request.max_results]
             diagnostic.update({
-                "ok": bool(routes),
+                # A valid empty itinerary list is a successful provider check,
+                # not a transport failure.
+                "ok": True,
                 "origin_match": {"id": origin.get("id"), "name": origin.get("name")},
                 "destination_match": {"id": destination.get("id"), "name": destination.get("name")},
                 "routes": len(routes),

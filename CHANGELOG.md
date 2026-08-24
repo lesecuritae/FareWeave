@@ -1,4 +1,13 @@
 # Changelog
+## 0.2.1 - 2026-08-24
+
+- Technische Stations-, Provider- und Datenbank-IDs aus den Suchvorschlägen entfernt; angezeigt werden nur Stationsname und Ort/Land.
+- Mobilfunkbereich in Fahrtkarten deutlich kompakter gestaltet und Quellen-, Lizenz- sowie Methodentexte aus der Kartenansicht entfernt.
+- Mobilfunkdarstellung auf einzelne Betreiberwerte vorbereitet; Schwellenwerte wie „mindestens 1/2/3 Netze“ werden nicht mehr in der Oberfläche ausgegeben. Der aktuelle anbieterneutrale BNetzA-Raster wird nicht fälschlich einzelnen Betreibern zugeschrieben.
+- OpenCellID als optionale Betreiberquelle mit MCC/MNC-Zuordnung, Vollstreckenprüfung, Qualitätsgrenze und Versorgungslückenerkennung ergänzt; lokale CSV-Downloads und berechtigte API-Zugriffe sind konfigurierbar.
+- Leere Flix-Suchen werden als „Keine Flix-Verbindung verfügbar“ behandelt; nur technische Fehler erscheinen als „Flix konnte nicht geprüft werden“.
+- Providerergebnisse unterscheiden nun maschinenlesbar zwischen gefundener Verbindung, erfolgreicher Prüfung ohne Verbindung und technischem Abruffehler.
+
 ## 0.2.0 - 2026-08-24
 
 - Flexible Preissuche für Bodenreisen über 3, 7 oder individuell 1 bis maximal 14 aufeinanderfolgende Reisetage.

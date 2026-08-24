@@ -364,14 +364,14 @@ async def search(request, *, force_refresh: bool = False) -> dict[str, Any]:
 
 def _stop_suggestions_sync(database: Path, query: str) -> list[dict[str, Any]]:
     with sqlite3.connect(database) as db:
-        rows = db.execute("SELECT stop_id,name,timezone,latitude,longitude FROM stop").fetchall()
+        rows = db.execute("SELECT stop_id,name,timezone,latitude,longitude,parent_station FROM stop").fetchall()
     ranked = sorted(((stop_score(query, row[1]), row) for row in rows), reverse=True, key=lambda item: (item[0], item[1][1]))
     output, names = [], set()
     for score, row in ranked:
         normalized = _key(row[1])
         if score < 60 or normalized in names: continue
         names.add(normalized)
-        output.append({"station_id": row[0], "name": row[1], "timezone": row[2], "latitude": row[3], "longitude": row[4]})
+        output.append({"station_id": row[0], "name": row[1], "timezone": row[2], "latitude": row[3], "longitude": row[4], "parent_station": row[5] or None, "location_type": 0 if row[5] else 1})
         if len(output) >= 12: break
     return output
 

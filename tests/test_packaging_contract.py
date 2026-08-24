@@ -41,11 +41,14 @@ assert 'HISTORY_SNAPSHOT_INTERVAL_SECONDS: "${HISTORY_SNAPSHOT_INTERVAL_SECONDS:
 assert 'SEARCH_DEPARTURE_TOLERANCE_MINUTES: "${SEARCH_DEPARTURE_TOLERANCE_MINUTES:-15}"' in compose
 assert "HEALTHCHECK" in app_dockerfile and "/api/health" in app_dockerfile
 assert "HEALTHCHECK" in db_api_dockerfile and "/health" in db_api_dockerfile
-assert "fareweave/0.2.0" in db_api_server and "fareweave/0.0.6" not in db_api_server
-assert 'version = "0.2.0"' in pyproject
+assert "fareweave/0.2.1" in db_api_server and "fareweave/0.0.6" not in db_api_server
+assert 'version = "0.2.1"' in pyproject
 assert "Pillow" not in runtime_requirements
 for coverage_file in ("provider.py", "mapper.py", "analyzer.py", "cache.py"):
     assert (root / "tool" / "reisevergleich" / "coverage" / coverage_file).is_file()
+assert (root / "tool" / "reisevergleich" / "coverage" / "opencellid.py").is_file()
+assert "OPENCELLID_API_KEY" in compose and "OPENCELLID_API_KEY=" in env_example
+assert "OpenCellID" in third_party
 coverage_data = root / "tool" / "reisevergleich" / "coverage" / "data" / "mobile_broadband_2025_12.fwcov"
 assert coverage_data.stat().st_size > 1_000_000
 assert hashlib.sha256(coverage_data.read_bytes()).hexdigest() == "25330fedbd820a4ee6064aaeb2c4dabf621f10ab6b9df4feaad5c0a8e978b0c6"

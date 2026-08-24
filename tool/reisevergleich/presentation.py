@@ -573,6 +573,7 @@ def _ground_direction(component: Any, dticket_routes: Any = None) -> dict[str, A
         "split_ticket": _public_links(component.get("split_ticket")),
         "manual_db_links": _public_links(component.get("manual_db_links")),
         "warnings": component.get("warnings"),
+        "provider_statuses": component.get("provider_statuses"),
         "connections": _public_links(complete_connections(
             component,
             dticket_routes if isinstance(dticket_routes, list) else [],

@@ -73,7 +73,12 @@ assert "position:static" in css
 assert 'id="searchProgress"' in html
 assert "X-Search-ID" in js
 assert "controller.abort()" in js
-assert "progressLabels" in js and "GTFS-Fahrplan" in js and "Ergebnisaufbereitung" in js
+assert "progressLabels" in js and "Flix-Fahrplan" in js and "Ergebnisaufbereitung" in js
+assert "station.provider_id}</span>" not in js
+assert "data.operator_networks" in js and "data.networks || []" not in js
+for hidden_coverage_text in ["Mindestens 1 Netz", "Mindestens 2 Netze", "Mindestens 3 Netze", "coverage-source"]:
+    assert hidden_coverage_text not in js
+assert "Keine Flix-Verbindung verfügbar" in js
 assert "flix_origin_stop_id:" in js and "flix_destination_stop_id:" in js
 assert "Automatisch" in html and "/api/flix-stops" in js
 

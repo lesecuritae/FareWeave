@@ -8,7 +8,7 @@
 
 Rail, the Deutschlandticket, split tickets, FlixTrain, FlixBus, flights, airport feeders, transfers, and accommodation are combined into a single itinerary. FareWeave does not merely look for a low price somewhere. Every part of the journey must fit together both chronologically and logically.
 
-Current version: **0.2.0**
+Current version: **0.2.1**
 
 FareWeave does not sell or book anything itself. If a provider supplies a usable offer link, it can be opened directly from the result. Where no direct link is available, FareWeave offers a suitable manual cross-check, for example with Deutsche Bahn, Google Flights, Google Hotels, or Google Maps. Price and availability must always be verified with the actual provider.
 
@@ -367,9 +367,9 @@ For ground journeys FareWeave can compare current connections and prices across 
 
 ## Mobile coverage along a journey
 
-For ground journeys, FareWeave loads a separate coverage analysis for each visible connection after the journey response has rendered. This is transport-neutral and covers DB long-distance and regional rail, FlixTrain, FlixBus, and international partner services. The openly licensed 100 m mobile-monitoring CSV grid is used to conservatively calculate the route share with at least one, two, or three broadband networks (4G or 5G). The public grid does not identify local operators, so FareWeave does not invent individual Telekom, Vodafone, Telefónica/O2, or 1&1 values. Successful analyses are stored for seven days in the existing SQLite cache under a stable route hash.
+For ground journeys, FareWeave loads a separate coverage analysis for each visible connection after the journey response has rendered. Operator values for Telekom, Vodafone, Telefónica/O2 and, where evidenced, 1&1 are calculated from OpenCellID cells along the complete route geometry. Internal assignment uses current German MCC/MNC blocks. If spatial OpenCellID evidence is insufficient, FareWeave displays “Operator data unavailable” and does not estimate values. The operator-neutral BNetzA grid remains an internal supplementary calculation. Successful analyses are cached for seven days under a stable route hash.
 
-The values are outdoor predictions on a 100×100 m grid, not a guarantee of reception or throughput inside a vehicle. Existing geometry and Flix GTFS shapes take precedence, followed by coordinated intermediate stops and finally a clearly labelled straight-line approximation. The source does not identify tunnels separately. Coverage-analysis failures never change or delay journey results.
+OpenCellID cell locations are crowdsourced evidence, not a guarantee of reception or throughput inside a vehicle. Existing geometry and Flix GTFS shapes take precedence, followed by coordinated intermediate stops and finally a clearly labelled straight-line approximation. Coverage-analysis failures never change or delay journey results. Set `OPENCELLID_CSV_PATH` for a local database download or `OPENCELLID_API_KEY` for an authorised API account.
 
 Journey searches include connections departing up to 15 minutes before the requested time by default. Such departures are explicitly labelled as “x minutes before the requested time”. The window is configured centrally through `SEARCH_DEPARTURE_TOLERANCE_MINUTES`; the user's input itself remains unchanged.
 

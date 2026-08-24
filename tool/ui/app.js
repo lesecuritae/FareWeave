@@ -17,7 +17,7 @@ let activeSearch = null;
 let coverageQueue = [];
 let coverageGeneration = 0;
 let activeCalendarSearch = null;
-const progressLabels = {db:'Deutsche Bahn', transitous:'Transitous', gtfs:'GTFS-Fahrplan', flixbus:'FlixBus', flixtrain:'FlixTrain', merge:'Ergebnisaufbereitung'};
+const progressLabels = {db:'Deutsche Bahn', transitous:'Transitous', gtfs:'Flix-Fahrplan', flixbus:'FlixBus', flixtrain:'FlixTrain', merge:'Ergebnisaufbereitung'};
 const statusLabels = {waiting:'wartet', loading:'wird geladen', processing:'wird verarbeitet', completed:'abgeschlossen', empty:'keine Ergebnisse', failed:'fehlgeschlagen', cancelled:'abgebrochen'};
 
 function renderProgress(data={}) {
@@ -277,9 +277,10 @@ const stationTimers = {};
 const stationRequestVersions = {origin:0, destination:0};
 function renderStationSuggestions(field, stations) {
   const panel = $(`${field}Suggestions`);
-  panel.innerHTML = (stations || []).map((station, index) =>
-    `<button type="button" role="option" data-station-index="${index}"><strong>${esc(station.label || station.name)}</strong><span>${esc({db:'DB',transitous:'International',flix:'Flix'}[station.provider] || station.provider)} · ${esc(station.provider_id)}</span></button>`
-  ).join('');
+  panel.innerHTML = (stations || []).map((station, index) => {
+    const place = [station.region, station.country].filter(Boolean).join(', ');
+    return `<button type="button" role="option" data-station-index="${index}"><strong>${esc(station.name)}</strong>${place ? `<span>${esc(place)}</span>` : ''}</button>`;
+  }).join('');
   panel.classList.toggle('hidden', !stations?.length);
   panel.querySelectorAll('button').forEach(button => button.addEventListener('click', () => {
     selectStation(field, stations[Number(button.dataset.stationIndex)]);
@@ -457,16 +458,15 @@ function coverageResultHtml(data) {
   if (!data || data.status !== 'ok') {
     return '<p class="coverage-unavailable">Mobilfunkanalyse momentan nicht verfügbar</p>';
   }
-  const networks = (data.networks || []).map(network => {
+  const networks = (data.operator_networks || []).map(network => {
     const percent = network.coverage_percent;
     const gaps = (network.weak_sections || []).map(gap =>
       `<li>km ${esc(gap.from_km)}–${esc(gap.to_km)} · ca. ${esc(gap.length_km)} km${gap.between?.filter(Boolean).length ? ` · ${esc(gap.between.filter(Boolean).join(' → '))}` : ''}</li>`
     ).join('');
-    return `<div class="coverage-network"><div><strong>${esc(network.name)}</strong><span>${percent === null || percent === undefined ? 'keine Daten' : `${esc(percent)} %`}</span></div><div class="coverage-meter" role="meter" aria-label="${esc(network.name)} Mobilfunkabdeckung" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${esc(percent ?? 0)}"><i style="width:${Math.max(0, Math.min(100, Number(percent) || 0))}%"></i></div>${gaps ? `<details><summary>Schwache Abschnitte</summary><ul>${gaps}</ul></details>` : '<small>Keine längere Lücke im analysierten Verlauf erkannt.</small>'}</div>`;
+    return `<div class="coverage-network"><div><strong>${esc(network.name)}</strong><span>${percent === null || percent === undefined ? 'keine Daten' : `${esc(percent)} %`}</span></div><div class="coverage-meter" role="meter" aria-label="${esc(network.name)} Mobilfunkabdeckung" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${esc(percent ?? 0)}"><i style="width:${Math.max(0, Math.min(100, Number(percent) || 0))}%"></i></div>${gaps ? `<details class="coverage-details"><summary>Details</summary><ul>${gaps}</ul></details>` : ''}</div>`;
   }).join('');
-  const scope = data.scope === 'germany_only' ? ` · ${esc(data.outside_source_area_count)} Punkte außerhalb Deutschlands nicht bewertet` : '';
-  const operatorNote = data.operator_specific?.message ? `<p class="coverage-note">${esc(data.operator_specific.message)} Berücksichtigte Betreiber: ${esc((data.operator_specific.operators_considered || []).join(', '))}.</p>` : '';
-  return `${networks}<p class="coverage-note">${esc(data.method || '')} · ${esc(data.evaluated_sample_count ?? data.sample_count)} von ${esc(data.sample_count)} Prüfpunkten · ca. ${esc(data.route_distance_km)} km${scope}</p>${operatorNote}<a class="link coverage-source" href="${esc(data.source?.url || '#')}" target="_blank" rel="noopener noreferrer">Quelle: ${esc(data.source?.name || 'Mobilfunkdaten')} · Stand ${esc(data.source?.revision || 'siehe Quelle')} · ${esc(data.source?.attribution || '')}</a>`;
+  if (!networks) return '<p class="coverage-unavailable">Betreiberdaten nicht verfügbar</p>';
+  return networks;
 }
 
 async function loadCoverage() {
@@ -496,7 +496,8 @@ async function loadCoverage() {
 function groundConnectionsHtml(title, component) {
   const connections = component?.connections || [];
   if (!connections.length) {
-    return `<section class="direction-group" data-direction="${esc(title)}"><div class="direction-heading"><div><span class="eyebrow">Bahn & Bus</span><h2>${esc(title)}</h2></div><span class="muted">0 Verbindungen</span></div><article class="result-card"><p class="muted">Keine automatisch auswertbare Verbindung gefunden.</p></article></section>`;
+    const statuses = (component?.provider_statuses || []).map(item => `<li><strong>${esc(item.provider)}</strong><span>${esc(item.provider === 'Flix' && item.outcome === 'no_connection' ? 'Keine Flix-Verbindung verfügbar' : item.message)}</span></li>`).join('');
+    return `<section class="direction-group" data-direction="${esc(title)}"><div class="direction-heading"><div><span class="eyebrow">Bahn & Bus</span><h2>${esc(title)}</h2></div><span class="muted">0 Verbindungen</span></div><article class="result-card"><p class="muted">Keine automatisch auswertbare Verbindung gefunden.</p>${statuses ? `<ul class="provider-statuses">${statuses}</ul>` : ''}</article></section>`;
   }
   const cards = connections.map(connection => {
     const coverageId = `coverage-${coverageGeneration}-${coverageQueue.length}`;

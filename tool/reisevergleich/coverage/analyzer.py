@@ -16,6 +16,7 @@ from .provider import (
     SOURCE_URL,
     sample,
 )
+from .opencellid import sample_operators
 
 
 def _gaps(points: list[dict[str, Any]], values: list[bool | None]) -> list[dict[str, Any]]:
@@ -49,6 +50,7 @@ async def analyze_route(route: dict[str, Any]) -> dict[str, Any]:
                 return {"status": "unavailable", "message": "Mobilfunkanalyse momentan nicht verfügbar", "reason": "route_geometry_missing"}
             identifier = route_hash(points)
             coverage = await asyncio.wait_for(sample(points), timeout=12)
+            operator_networks = await asyncio.wait_for(sample_operators(points), timeout=20)
             networks: list[dict[str, Any]] = []
             evaluated_union = sum(
                 any(coverage[key][index] is not None for key in PROVIDERS)
@@ -75,10 +77,15 @@ async def analyze_route(route: dict[str, Any]) -> dict[str, Any]:
                 "outside_source_area_count": len(points) - evaluated_union,
                 "scope": "germany_only" if evaluated_union < len(points) else "complete_sampled_route",
                 "networks": networks,
+                "operator_networks": operator_networks,
                 "operator_specific": {
-                    "status": "not_available_in_licensed_route_data",
+                    "status": "available" if operator_networks else "not_available",
                     "operators_considered": OPERATORS_CONSIDERED,
-                    "message": "Die offenen Rasterdaten nennen lokal nur die Anzahl der Netze, nicht deren Identität.",
+                    "source": "OpenCellID",
+                    "evaluated_points": len(points),
+                    "cell_count": sum(item.get("cell_count", 0) for item in operator_networks),
+                    "data_quality": ("good" if operator_networks and all(item.get("data_quality") == "good" for item in operator_networks) else "limited" if operator_networks else "insufficient"),
+                    "message": "Betreiberdaten nicht verfügbar" if not operator_networks else None,
                 },
                 "tunnels": {"status": "not_available", "message": "Tunnel werden von der Abdeckungsquelle nicht separat ausgewiesen."},
                 "method": "Konservative Mindestanzahl breitbandiger Netze aus 4G-/5G-Betreiberzahlen; Outdoor-Prognose, Verlauf zwischen Halten interpoliert.",

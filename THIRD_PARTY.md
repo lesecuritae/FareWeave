@@ -2,7 +2,7 @@
 
 ## Bundesnetzagentur Mobilfunk-Monitoring
 
-FareWeave verwendet ausschließlich den ausdrücklich weiterverarbeitbaren CSV-Datensatz `202601_MobilfunkMonitoring.csv` (Datenstand Dezember 2025), nicht die anbieterspezifischen Web-Kacheln. Daraus wird ein kompakter 100-m-Rasterindex abgeleitet. Die Daten beschreiben prognostizierte Outdoor-Versorgung und nennen je Technologie die Zahl versorgender Netze, aber keine lokale Betreiberidentität. FareWeave zeigt deshalb nur konservative Mindestanzahlen und kein erfundenes Betreiber-Ranking.
+FareWeave verwendet den ausdrücklich weiterverarbeitbaren CSV-Datensatz `202601_MobilfunkMonitoring.csv` (Datenstand Dezember 2025), nicht die anbieterspezifischen Web-Kacheln. Daraus wird intern ein kompakter 100-m-Rasterindex abgeleitet. Die Daten beschreiben prognostizierte Outdoor-Versorgung und nennen je Technologie die Zahl versorgender Netze, aber keine lokale Betreiberidentität. Diese Werte werden deshalb nicht einzelnen Betreibern zugeschrieben.
 
 - Datensatz: https://data.bundesnetzagentur.de/Bundesnetzagentur/GIGA/DE/MobilfunkMonitoring/2512/202601_MobilfunkMonitoring.zip
 - Lizenz: Datenlizenz Deutschland – Namensnennung – Version 2.0
@@ -10,6 +10,15 @@ FareWeave verwendet ausschließlich den ausdrücklich weiterverarbeitbaren CSV-D
 - Methodik: https://gigabitgrundbuch.bund.de/GIGA/DE/MobilfunkMonitoring/start.html
 - Rechtliche Hinweise: https://gigabitgrundbuch.bund.de/GIGA/DE/Impressum/start.html
 - Datenursprung: Netzbetreiberangaben mit Plausibilitätsprüfung durch die Bundesnetzagentur
+
+## OpenCellID
+
+Optionale betreiberbezogene Streckenauswertungen verwenden OpenCellID-Zellstandorte. FareWeave ordnet ausschließlich bekannte deutsche MCC/MNC-Kombinationen den öffentlichen Netzen zu und zeigt bei unzureichender räumlicher Evidenz keine Werte. Eine lokale OpenCellID-CSV kann über `OPENCELLID_CSV_PATH`, der zugangsbeschränkte Bereichsdienst über `OPENCELLID_API_KEY` konfiguriert werden. API-Nutzung und Downloads unterliegen den OpenCellID-Zugangsbedingungen.
+
+- Projekt und API: https://opencellid.org/
+- Datenformat: https://wiki.opencellid.org/wiki/Database_format
+- Lizenz des Datenbankdownloads: Creative Commons Attribution-ShareAlike 4.0 International
+- Betreiberzuordnung: MCC/MNC-Zuteilungsliste der Bundesnetzagentur, Stand 24.02.2026
 
 FareWeave lädt die beiden großen Transportbibliotheken beim Container-Build aus ihren jeweiligen Upstream-Repositories. Die folgenden Lizenzbedingungen gelten unabhängig von der FareWeave-Projektlizenz.
 

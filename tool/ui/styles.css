@@ -235,25 +235,25 @@ body {
 .direction-heading { display: flex; align-items: end; justify-content: space-between; gap: 16px; padding: 8px 4px 0; }
 .direction-heading h2 { margin: 3px 0 0; font-size: 20px; }
 
-.coverage-panel { margin-top:16px; padding:14px; border:1px solid #c9dfe1; border-radius:13px; background:#f5fbfb; }
+.coverage-panel { margin-top:12px; padding:12px 14px; border:1px solid #c9dfe1; border-radius:13px; background:#f5fbfb; }
 .coverage-heading { display:flex; justify-content:space-between; gap:12px; align-items:center; }
 .coverage-heading > span { color:var(--muted); font-size:16px; }
-.coverage-content { display:grid; gap:10px; margin-top:11px; }
+.coverage-content { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px 18px; margin-top:9px; }
 .coverage-loading, .coverage-unavailable { color:var(--muted); margin:0; }
 .coverage-network > div:first-child { display:flex; justify-content:space-between; gap:12px; font-size:16px; }
 .coverage-meter { height:9px; margin-top:5px; overflow:hidden; border-radius:999px; background:#d7e5e7; }
 .coverage-meter i { display:block; height:100%; border-radius:inherit; background:linear-gradient(90deg,#e0a119,#18a999); }
-.coverage-network small { display:block; margin-top:4px; color:var(--muted); }
 .coverage-network details { margin-top:5px; color:var(--muted); font-size:16px; }
 .coverage-network ul { margin:6px 0 0; padding-left:20px; }
-.coverage-note { margin:2px 0 0; color:var(--muted); font-size:16px; line-height:1.4; }
-.coverage-source { font-size:16px; width:max-content; max-width:100%; }
 @media (max-width:620px) {
   .coverage-heading { align-items:flex-start; flex-direction:column; gap:2px; }
   .coverage-panel { padding:12px; }
+  .coverage-content { grid-template-columns:1fr; gap:7px; }
 }
 .direction-count { color: var(--muted); font-size: 16px; font-weight: 800; }
 .connection-list { display: grid; gap: 12px; }
+.provider-statuses { display:grid; gap:6px; margin:12px 0 0; padding:0; list-style:none; }
+.provider-statuses li { display:flex; justify-content:space-between; gap:12px; color:var(--muted); }
 .connection-card h3 { margin: 7px 0 0; font-size: 21px; font-variant-numeric: tabular-nums; }
 .connection-labels { min-height: 24px; }
 .connection-summary { margin: 5px 0 0; color: var(--muted); font-size: 16px; }

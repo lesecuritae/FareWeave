@@ -12,6 +12,11 @@ from .gtfs_flix import discover_stops
 from .location_resolver import exact_location_key, location_candidates, location_key
 
 _CACHE_TTL = 300
+_RANKING_GENERATION = "stations-v3"
+
+
+def _base_station_query(value: str) -> str:
+    return " ".join(word for word in value.split() if exact_location_key(word) not in {"hbf", "hauptbahnhof", "bahnhof", "station"})
 
 
 def _distance_km(left: dict[str, Any], right: dict[str, Any]) -> float | None:
@@ -25,16 +30,37 @@ def _distance_km(left: dict[str, Any], right: dict[str, Any]) -> float | None:
     return 6371 * 2 * asin(sqrt(value))
 
 
-def _score(query: str, name: str, provider: str) -> int:
+_SECONDARY_STATION_WORDS = {
+    "ausgang", "südausgang", "nordausgang", "ostausgang", "westausgang",
+    "eingang", "zugang", "bahnsteig", "gleis", "vorplatz", "parkplatz", "park",
+}
+
+
+def _station_role_score(name: str, item: dict[str, Any] | None = None) -> int:
+    words = set(exact_location_key(name).replace("-", " ").split())
+    score = 180 if words & {"hbf", "hauptbahnhof", "central", "centrale", "centraal"} else 0
+    if words & _SECONDARY_STATION_WORDS:
+        score -= 350
+    item = item or {}
+    if item.get("parent_station"):
+        score -= 220
+    if str(item.get("location_type") or "") == "1" or item.get("is_station") is True:
+        score += 100
+    return score
+
+
+def _score(query: str, name: str, provider: str, item: dict[str, Any] | None = None) -> int:
     exact_query, exact_name = exact_location_key(query), exact_location_key(name)
     alias_query, alias_name = location_key(query), location_key(name)
     score = {"db": 30, "transitous": 20, "flix": 10}.get(provider, 0)
     candidates = location_candidates(query)
     canonical = candidates[1] if len(candidates) > 1 and len(exact_location_key(candidates[1]).split()) > 1 else None
     if canonical and exact_location_key(name) == exact_location_key(canonical):
-        return score + 1200
+        return score + 1200 + _station_role_score(name, item)
     if exact_query == exact_name:
-        return score + 1000
+        return score + 1000 + _station_role_score(name, item)
+    if exact_location_key(_base_station_query(query)) == exact_name:
+        return score + 850 + _station_role_score(name, item)
     if exact_name.startswith(exact_query + " "):
         score += 600
     elif alias_query == alias_name:
@@ -43,7 +69,7 @@ def _score(query: str, name: str, provider: str) -> int:
         score += 350
     elif set(alias_query.split()) <= set(alias_name.split()):
         score += 200
-    return score
+    return score + _station_role_score(name, item)
 
 
 async def _db_locations(query: str) -> list[dict[str, Any]]:
@@ -73,6 +99,8 @@ async def _transitous_locations(query: str) -> list[dict[str, Any]]:
         "country": item.get("country"),
         "region": next((area.get("name") for area in item.get("areas") or [] if area.get("unique")), None),
         "modes": item.get("modes") or [],
+        "parent_station": item.get("parentStation") or item.get("parent_station"),
+        "location_type": item.get("locationType") or item.get("location_type"),
     } for item in items if isinstance(item, dict) and item.get("id")]
 
 
@@ -81,6 +109,7 @@ async def _flix_locations(query: str) -> list[dict[str, Any]]:
     return [{
         "provider": "flix", "provider_id": item["station_id"], "name": item["name"],
         "latitude": item.get("latitude"), "longitude": item.get("longitude"),
+        "parent_station": item.get("parent_station"), "location_type": item.get("location_type"),
     } for item in result.get("origin_stops") or []]
 
 
@@ -93,7 +122,10 @@ async def _all_queries(loader, queries: tuple[str, ...]) -> list[dict[str, Any]]
 
 
 async def _search_uncached(normalized: str, limit: int) -> dict[str, Any]:
-    queries = location_candidates(normalized)[:2]
+    queries = list(location_candidates(normalized)[:2])
+    base_query = _base_station_query(normalized)
+    if base_query and exact_location_key(base_query) not in {exact_location_key(query) for query in queries}:
+        queries.append(base_query)
     results = await asyncio.gather(
         _all_queries(_db_locations, queries),
         _all_queries(_transitous_locations, queries),
@@ -111,7 +143,13 @@ async def _search_uncached(normalized: str, limit: int) -> dict[str, Any]:
 
     groups: list[dict[str, Any]] = []
     seen: set[tuple[str, str]] = set()
-    for item in sorted(candidates, key=lambda entry: (-_score(normalized, entry["name"], entry["provider"]), entry["name"])):
+    for item in sorted(candidates, key=lambda entry: (-_score(normalized, entry["name"], entry["provider"], entry), entry["name"])):
+        if (
+            item.get("is_station") is True
+            and exact_location_key(item["name"]) == exact_location_key(base_query)
+            and any(token in exact_location_key(normalized).split() for token in {"hbf", "hauptbahnhof"})
+        ):
+            item = {**item, "name": normalized}
         key = (item["provider"], item["provider_id"])
         if key in seen: continue
         seen.add(key)
@@ -130,7 +168,7 @@ async def _search_uncached(normalized: str, limit: int) -> dict[str, Any]:
     for item in groups[:min(max(limit, 1), 20)]:
         detail = ", ".join(str(part) for part in (item.get("region"), item.get("country")) if part)
         ranked.append({**item, "label": f"{item['name']} — {detail}" if detail else item["name"], "id": f"{item['provider']}:{item['provider_id']}"})
-    scores = [_score(normalized, item["name"], item["provider"]) for item in ranked]
+    scores = [_score(normalized, item["name"], item["provider"], item) for item in ranked]
     for item, score in zip(ranked, scores):
         item["type"] = "airport" if "airport" in location_key(item["name"]).split() or "flughafen" in location_key(item["name"]).split() else "station"
         item["confidence"] = round(min(0.99, max(0.01, score / 1050)), 2)
@@ -139,8 +177,8 @@ async def _search_uncached(normalized: str, limit: int) -> dict[str, Any]:
         "münchen", "munchen", "muenchen", "munich", "köln", "koln", "koeln", "cologne", "zürich", "zurich", "zuerich",
         "wien", "prag", "prague", "mailand", "milan", "rom", "rome",
     }
-    top_score = _score(normalized, ranked[0]["name"], ranked[0]["provider"]) if ranked else 0
-    second_score = _score(normalized, ranked[1]["name"], ranked[1]["provider"]) if len(ranked) > 1 else -1
+    top_score = _score(normalized, ranked[0]["name"], ranked[0]["provider"], ranked[0]) if ranked else 0
+    second_score = _score(normalized, ranked[1]["name"], ranked[1]["provider"], ranked[1]) if len(ranked) > 1 else -1
     alias_is_safe = exact_location_key(normalized) in safe_alias_inputs and top_score - second_score >= 100
     auto = ranked[0] if ranked and (len(ranked) == 1 or explicit_station or alias_is_safe) else None
     return {
@@ -152,5 +190,5 @@ async def _search_uncached(normalized: str, limit: int) -> dict[str, Any]:
 
 async def search_stations(query: str, limit: int = 12) -> dict[str, Any]:
     normalized = " ".join(str(query or "").split())
-    key = {"generation": APP_VERSION, "exact_query": exact_location_key(normalized), "alias_query": location_key(normalized), "limit": limit}
+    key = {"generation": APP_VERSION, "ranking": _RANKING_GENERATION, "exact_query": exact_location_key(normalized), "alias_query": location_key(normalized), "limit": limit}
     return await cached_call("locations.resolve", key, _CACHE_TTL, lambda: _search_uncached(normalized, limit))

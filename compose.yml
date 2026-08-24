@@ -23,7 +23,7 @@ services:
     container_name: fareweave-db-api
     environment:
       PORT: "3001"
-      USER_AGENT: fareweave/0.2.0
+      USER_AGENT: fareweave/0.2.1
       DB_CFFI_BRIDGE_URL: http://app:8000/internal/db-cffi/request
       DB_CFFI_TOKEN: "${DB_CFFI_TOKEN:-}"
       DB_CFFI_TOKEN_FILE: /run/fareweave-secrets/db_cffi_token
@@ -93,6 +93,9 @@ services:
       TRANSFER_PROVIDER_CONCURRENCY: "2"
       TRANSITOUS_TIMEOUT: "25"
       SEARCH_DEPARTURE_TOLERANCE_MINUTES: "${SEARCH_DEPARTURE_TOLERANCE_MINUTES:-15}"
+      OPENCELLID_API_KEY: "${OPENCELLID_API_KEY:-}"
+      OPENCELLID_CSV_PATH: "${OPENCELLID_CSV_PATH:-}"
+      OPENCELLID_SEARCH_RADIUS_KM: "${OPENCELLID_SEARCH_RADIUS_KM:-5}"
       DB_SEARCH_TIMEOUT: "50"
       DB_SPLIT_TIMEOUT: "45"
       TRIP_TIMEOUT: "210"

@@ -29,4 +29,4 @@ def waypoint_hash(waypoints: list[dict[str, Any]]) -> str:
 async def get_or_analyze(route_id: str, producer: Callable[[], Awaitable[dict[str, Any]]]) -> dict[str, Any]:
     # Namespace is an explicit result-schema/algorithm generation. Bumping it
     # invalidates derived values without touching any user's persisted data.
-    return await cached_call("coverage-v1.1.0", {"route_id": route_id}, CACHE_TTL_SECONDS, producer)
+    return await cached_call("coverage-v1.2.0", {"route_id": route_id}, CACHE_TTL_SECONDS, producer)

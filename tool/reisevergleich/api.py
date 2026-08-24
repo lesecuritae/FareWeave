@@ -94,7 +94,7 @@ async def health() -> dict[str, Any]:
         "version": APP_VERSION,
         "current_date": today_iso(),
         "architecture": "deterministic",
-        "providers": ["DB/db-vendo", "Transitous", "Flix", "trvl", "BNetzA Mobilfunk-Monitoring"],
+        "providers": ["DB/db-vendo", "Transitous", "Flix", "trvl", "BNetzA Mobilfunk-Monitoring", "OpenCellID"],
     }
 
 

@@ -8,7 +8,7 @@
 
 Bahn, Deutschlandticket, Split-Tickets, FlixTrain, FlixBus, Flüge, Flughafenzubringer, Transfers und Unterkünfte landen in einer gemeinsamen Planung. FareWeave schaut dabei nicht nur, ob irgendwo ein günstiger Preis auftaucht. Die einzelnen Teile müssen zeitlich und logisch zusammenpassen.
 
-Aktuelle Version: **0.2.0**
+Aktuelle Version: **0.2.1**
 
 FareWeave verkauft und bucht selbst nichts. Wenn ein Provider einen brauchbaren Angebotslink liefert, kann er direkt aus dem Ergebnis geöffnet werden. Wo kein direkter Link vorhanden ist, gibt es an passenden Stellen einen manuellen Gegencheck, etwa bei der Deutschen Bahn, Google Flights, Google Hotels oder Google Maps. Preis und Verfügbarkeit werden beim eigentlichen Anbieter noch einmal geprüft.
 
@@ -369,9 +369,9 @@ Für Bodenreisen kann FareWeave ab dem gewählten Abreisetag aktuelle Verbindung
 
 ## Mobilfunkabdeckung entlang der Fahrt
 
-Bei Bodenreisen lädt FareWeave nach der eigentlichen Reiseantwort automatisch eine separate Abdeckungsanalyse je sichtbarer Verbindung. Das gilt verkehrsmittelneutral für DB-Fernverkehr, Regionalbahn, FlixTrain, FlixBus und internationale Partnerverbindungen. Aus dem offen lizenzierten 100-m-CSV-Raster des Mobilfunk-Monitorings wird konservativ berechnet, auf welchem Streckenanteil mindestens ein, zwei oder drei breitbandige Netze (4G oder 5G) verfügbar sind. Die öffentlichen Rasterdaten nennen lokal keine Betreiberidentitäten; FareWeave weist deshalb Telekom, Vodafone, Telefónica/O2 oder 1&1 keine erfundenen Einzelwerte zu. Erfolgreiche Auswertungen werden anhand eines Route-Hashs sieben Tage im bestehenden SQLite-Cache gespeichert.
+Bei Bodenreisen lädt FareWeave nach der eigentlichen Reiseantwort automatisch eine separate Abdeckungsanalyse je sichtbarer Verbindung. Das gilt verkehrsmittelneutral für DB-Fernverkehr, Regionalbahn, FlixTrain, FlixBus und internationale Partnerverbindungen. Betreiberwerte für Telekom, Vodafone, Telefónica/O2 und – sofern belegt – 1&1 werden aus OpenCellID-Funkzellen entlang der vollständigen Streckengeometrie berechnet. Die Zuordnung erfolgt intern über die aktuellen deutschen MCC/MNC-Blöcke. Reichen die räumlichen OpenCellID-Daten nicht aus, zeigt FareWeave „Betreiberdaten nicht verfügbar“ und schätzt keine Werte. Der anbieterneutrale BNetzA-Raster bleibt nur als interne Zusatzberechnung erhalten. Erfolgreiche Auswertungen werden anhand eines Route-Hashs sieben Tage im bestehenden SQLite-Cache gespeichert.
 
-Die Werte sind Outdoor-Prognosen im 100×100-m-Raster, keine Garantie für Empfang oder Datenrate im Fahrzeug. Vorhandene Geometrien und Flix-GTFS-Shapes werden bevorzugt; danach folgen koordinierte Zwischenhalte und erst zuletzt eine gerade Näherung. Tunnel werden von der Quelle nicht separat ausgewiesen. Fehler der Abdeckungsanalyse verändern oder verzögern die Reiseergebnisse nicht.
+OpenCellID-Zellstandorte sind eine crowdsourcete Datenbasis und keine Garantie für Empfang oder Datenrate im Fahrzeug. Vorhandene Geometrien und Flix-GTFS-Shapes werden bevorzugt; danach folgen koordinierte Zwischenhalte und erst zuletzt eine gerade Näherung. Fehler der Abdeckungsanalyse verändern oder verzögern die Reiseergebnisse nicht. Für lokale Datenbankdownloads kann `OPENCELLID_CSV_PATH`, für berechtigte API-Zugriffe `OPENCELLID_API_KEY` gesetzt werden.
 
 Die Reisesuche berücksichtigt standardmäßig Verbindungen bis zu 15 Minuten vor der gewünschten Abfahrtszeit. Eine solche Abfahrt wird im Ergebnis ausdrücklich als „x Minuten vor gewünschter Zeit“ markiert. Das Fenster ist zentral über `SEARCH_DEPARTURE_TOLERANCE_MINUTES` konfigurierbar; die Nutzereingabe selbst bleibt unverändert.
 

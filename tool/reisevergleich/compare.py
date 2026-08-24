@@ -18,6 +18,16 @@ from .progress import update as progress
 _route_departure_in_window = route_departure_in_window
 
 
+def _provider_state(provider: str, *, ok: bool, result_count: int = 0, skipped: bool = False) -> dict[str, Any]:
+    """Expose one unambiguous, UI-safe outcome without leaking diagnostics."""
+    if ok or skipped:
+        outcome = "connection_found" if result_count else "no_connection"
+        message = "Verbindung gefunden" if result_count else "Keine Verbindung verfügbar"
+    else:
+        outcome, message = "technical_error", "Technischer Abruffehler"
+    return {"provider": provider, "outcome": outcome, "message": message, "result_count": result_count}
+
+
 async def _enrich_history_bounded(routes: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Keep optional history I/O outside the critical search latency path."""
     try:
@@ -135,9 +145,10 @@ async def compare_trip(request: ReiseRequest) -> dict[str, Any]:
         try:
             value = task.result(); counts = value.get("candidate_counts") or {}
             ok = (value.get("provider_status") or {}).get("ok") is True
-            progress("gtfs", "completed" if ok else "failed", (value.get("provider_status") or {}).get("error"))
-            progress("flixbus", "completed" if counts.get("bus") else ("empty" if ok else "failed"))
-            progress("flixtrain", "completed" if counts.get("train") else ("empty" if ok else "failed"))
+            detail = None if counts.get("bus") or counts.get("train") else ("Keine Flix-Verbindung verfügbar" if ok else "Flix konnte nicht geprüft werden")
+            progress("gtfs", "completed" if ok else "failed", detail)
+            progress("flixbus", "completed" if counts.get("bus") else ("empty" if ok else "failed"), detail)
+            progress("flixtrain", "completed" if counts.get("train") else ("empty" if ok else "failed"), detail)
         except BaseException as exc:
             progress("gtfs", "failed", f"{type(exc).__name__}: {exc}")
             progress("flixbus", "failed"); progress("flixtrain", "failed")
@@ -162,9 +173,10 @@ async def compare_trip(request: ReiseRequest) -> dict[str, Any]:
         flix_result = await flix_task
         counts = flix_result.get("candidate_counts") or {}
         provider_ok = (flix_result.get("provider_status") or {}).get("ok") is True
-        progress("gtfs", "completed" if provider_ok else "failed", (flix_result.get("provider_status") or {}).get("error"))
-        progress("flixbus", "completed" if counts.get("bus") else ("empty" if provider_ok else "failed"))
-        progress("flixtrain", "completed" if counts.get("train") else ("empty" if provider_ok else "failed"))
+        detail = None if counts.get("bus") or counts.get("train") else ("Keine Flix-Verbindung verfügbar" if provider_ok else "Flix konnte nicht geprüft werden")
+        progress("gtfs", "completed" if provider_ok else "failed", detail)
+        progress("flixbus", "completed" if counts.get("bus") else ("empty" if provider_ok else "failed"), detail)
+        progress("flixtrain", "completed" if counts.get("train") else ("empty" if provider_ok else "failed"), detail)
     except Exception as exc:
         progress("gtfs", "failed", f"{type(exc).__name__}: {exc}")
         progress("flixbus", "failed"); progress("flixtrain", "failed")
@@ -275,6 +287,20 @@ async def compare_trip(request: ReiseRequest) -> dict[str, Any]:
             "transitous": transitous_diagnostic,
             "flix": flix_result.get("provider_status"),
         },
+        "provider_statuses": [
+            _provider_state(
+                "DB", ok=any(item.get("ok") for item in db_attempts),
+                skipped=all(item.get("skipped") for item in db_attempts), result_count=len(db_routes),
+            ),
+            _provider_state(
+                "Transitous", ok=bool((transitous_diagnostic or {}).get("ok")),
+                skipped=bool((transitous_diagnostic or {}).get("skipped")), result_count=len(transitous_routes),
+            ),
+            _provider_state(
+                "Flix", ok=bool((flix_result.get("provider_status") or {}).get("ok")),
+                skipped=bool((flix_result.get("provider_status") or {}).get("skipped")), result_count=len(flix_routes),
+            ),
+        ],
         "db_options": [compact_route(route) for route in ranked_db[:3]],
         "flix_options": (flix_result.get("routes") or [])[:3],
         "visible_options": [
@@ -388,6 +414,7 @@ def _direction_summary(result: dict[str, Any]) -> dict[str, Any]:
         "split_ticket": result.get("split_ticket"),
         "manual_db_links": result.get("manual_db_links"),
         "warnings": result.get("warnings") or [],
+        "provider_statuses": result.get("provider_statuses") or [],
     }
 
 
