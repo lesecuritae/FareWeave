@@ -74,7 +74,9 @@ with tempfile.TemporaryDirectory() as temporary:
             {"route_id": "B", "service_id": "night", "trip_id": "night", "shape_id": "path"},
         ]),
         "stops.txt": csv_bytes(["stop_id", "stop_name", "parent_station", "stop_timezone", "stop_lat", "stop_lon"], [
-            {"stop_id": "L", "stop_name": "Leipzig central train station", "parent_station": "", "stop_timezone": "Europe/Berlin", "stop_lat": "51.345", "stop_lon": "12.381"},
+            {"stop_id": "LP", "stop_name": "Leipzig central station", "parent_station": "", "stop_timezone": "Europe/Berlin", "stop_lat": "51.345", "stop_lon": "12.381"},
+            {"stop_id": "L", "stop_name": "Leipzig central train station", "parent_station": "LP", "stop_timezone": "Europe/Berlin", "stop_lat": "51.345", "stop_lon": "12.381"},
+            {"stop_id": "LX", "stop_name": "Leipzig central bus station", "parent_station": "LP", "stop_timezone": "Europe/Berlin", "stop_lat": "51.346", "stop_lon": "12.383"},
             {"stop_id": "D", "stop_name": "Dortmund Central Station", "parent_station": "", "stop_timezone": "Europe/Berlin", "stop_lat": "51.518", "stop_lon": "7.459"},
         ]),
         "shapes.txt": csv_bytes(["shape_id", "shape_pt_lat", "shape_pt_lon", "shape_pt_sequence"], [
@@ -83,7 +85,7 @@ with tempfile.TemporaryDirectory() as temporary:
             {"shape_id": "path", "shape_pt_lat": "51.518", "shape_pt_lon": "7.459", "shape_pt_sequence": "3"},
         ]),
         "stop_times.txt": csv_bytes(["trip_id", "arrival_time", "departure_time", "stop_id", "stop_sequence"], [
-            {"trip_id": trip, "arrival_time": dep, "departure_time": dep, "stop_id": "L", "stop_sequence": "1"}
+            {"trip_id": trip, "arrival_time": dep, "departure_time": dep, "stop_id": "LX" if trip == "bus" else "L", "stop_sequence": "1"}
             for trip, dep in (("bus", "14:00:00"), ("train", "16:00:00"), ("removed", "18:00:00"), ("night", "24:15:00"))
         ] + [
             {"trip_id": trip, "arrival_time": arr, "departure_time": arr, "stop_id": "D", "stop_sequence": "2"}
@@ -112,7 +114,8 @@ with tempfile.TemporaryDirectory() as temporary:
     request.origin_station = StationSelection(name="Leipzig central train station", provider="flix", provider_id="L")
     request.destination_station = StationSelection(name="Dortmund Central Station", provider="flix", provider_id="D")
     selected = _search_sync(database, request)
-    assert selected["routes"] and all(route["origin"] == "Leipzig central train station" for route in selected["routes"])
+    assert selected["routes"]
+    assert {route["origin"] for route in selected["routes"]} == {"Leipzig central train station", "Leipzig central bus station"}
     request.origin_station = request.destination_station = None
     request.departure_after = "17:00"
     later = _search_sync(database, request)

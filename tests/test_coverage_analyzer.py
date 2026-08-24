@@ -51,7 +51,7 @@ def test_coverage_cache_uses_versioned_route_key(monkeypatch):
     result = asyncio.run(cache.get_or_analyze("known-route", producer))
     assert result == {"status": "ok"}
     assert observed == {
-        "namespace": "coverage-v1.2.0",
+        "namespace": "coverage-v1.3.0",
         "params": {"route_id": "known-route"},
         "ttl": 7 * 24 * 60 * 60,
     }
@@ -89,7 +89,7 @@ def test_network_summary_and_tunnel_limit(monkeypatch):
     monkeypatch.setattr(analyzer, "resolve_waypoints", resolved)
     monkeypatch.setattr(analyzer, "sample", samples)
     async def no_operator_data(_points):
-        return []
+        return {"networks": [], "debug": {"source": "not_configured", "evaluated_points": len(_points), "cells_found": 0}}
     monkeypatch.setattr(analyzer, "sample_operators", no_operator_data)
     monkeypatch.setattr(analyzer, "get_or_analyze", direct)
     result = asyncio.run(analyzer.analyze_route({"origin": "A", "destination": "B"}))

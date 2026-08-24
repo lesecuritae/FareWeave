@@ -10,7 +10,7 @@ from . import transitous as raw_transitous
 from . import trvl as raw_trvl
 from . import gtfs_flix
 
-CACHE_GENERATION = APP_VERSION
+CACHE_GENERATION = f"{APP_VERSION}-routing-v2"
 DB_TTL = 600
 SPLIT_TTL = 600
 FLIX_TTL = 600

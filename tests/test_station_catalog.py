@@ -57,6 +57,7 @@ def test_catalog_automatically_uses_an_exact_station_among_multiple_hits(monkeyp
     assert result["requires_selection"] is False
     assert result["auto_selection"]["name"] == "Leipzig Hbf"
     assert result["auto_selection"]["provider_ids"] == {"db":"8010205", "transitous":"de:hbf"}
+    assert result["auto_selection"]["provider_alias_ids"] == {"db":["8010205"], "transitous":["de:hbf"]}
 
 
 def test_catalog_automatically_uses_an_unambiguous_alias(monkeypatch):
@@ -101,3 +102,38 @@ def test_known_central_station_names_have_no_secondary_penalty():
         assert station_catalog._station_role_score(name, {"is_station": True}) >= 100
     for name in ("Görlitz Hbf Südausgang", "Berlin Hbf Eingang", "Kassel-Wilhelmshöhe Bahnsteig 1"):
         assert station_catalog._station_role_score(name) < 0
+
+
+def test_catalog_keeps_multiple_flix_ids_for_one_station_complex(monkeypatch):
+    async def db(_query):
+        return [{"provider":"db", "provider_id":"db-main", "name":"Berlin Hbf", "latitude":52.525, "longitude":13.369, "is_station":True}]
+    async def transitous(_query):
+        return [{"provider":"transitous", "provider_id":"transit-main", "name":"Berlin Hauptbahnhof", "latitude":52.525, "longitude":13.369}]
+    async def flix(_query):
+        return [
+            {"provider":"flix", "provider_id":"flix-train", "name":"Berlin central train station", "latitude":52.525, "longitude":13.369, "parent_station":"berlin"},
+            {"provider":"flix", "provider_id":"flix-bus", "name":"Berlin central bus stop", "latitude":52.526, "longitude":13.370, "parent_station":"berlin"},
+        ]
+    monkeypatch.setattr(station_catalog, "_db_locations", db)
+    monkeypatch.setattr(station_catalog, "_transitous_locations", transitous)
+    monkeypatch.setattr(station_catalog, "_flix_locations", flix)
+    async def direct_cache(_namespace, _key, _ttl, loader): return await loader()
+    monkeypatch.setattr(station_catalog, "cached_call", direct_cache)
+    result = asyncio.run(station_catalog.search_stations("Berlin Hbf"))
+    selected = result["auto_selection"]
+    assert selected["provider_ids"].keys() == {"db", "transitous", "flix"}
+    assert set(selected["provider_alias_ids"]["flix"]) == {"flix-train", "flix-bus"}
+
+
+def test_reference_main_stations_map_across_all_providers(monkeypatch):
+    names = ("Leipzig Hbf", "Berlin Hbf", "Frankfurt(Main) Hbf", "Kassel-Wilhelmshöhe", "Görlitz Hbf")
+    async def loader(provider, query):
+        return [{"provider":provider, "provider_id":f"{provider}:{query}", "name":query, "latitude":51.0, "longitude":12.0, "is_station":provider == "db"}]
+    monkeypatch.setattr(station_catalog, "_db_locations", lambda query: loader("db", query))
+    monkeypatch.setattr(station_catalog, "_transitous_locations", lambda query: loader("transitous", query))
+    monkeypatch.setattr(station_catalog, "_flix_locations", lambda query: loader("flix", query))
+    async def direct_cache(_namespace, _key, _ttl, producer): return await producer()
+    monkeypatch.setattr(station_catalog, "cached_call", direct_cache)
+    for name in names:
+        selected = asyncio.run(station_catalog.search_stations(name))["auto_selection"]
+        assert set(selected["provider_ids"]) == {"db", "transitous", "flix"}

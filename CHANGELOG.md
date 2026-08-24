@@ -1,4 +1,11 @@
 # Changelog
+## 0.2.2 - 2026-08-24
+
+- Provider-native Stations-IDs bleiben beim Zusammenführen als Alias-Menge erhalten; Flix löst ausgewählte Parent-, Child- und Geschwisterhaltestellen gemeinsam auf, damit Bus- und Zugfahrten desselben Stationskomplexes nicht verloren gehen.
+- Stations- und Provider-Caches erhalten neue Generationen, sodass korrigierte Hauptstations- und Routingzuordnungen unmittelbar wirksam werden.
+- OpenCellID verarbeitet lokale CSV-Bestände und berechtigte Bereichsabfragen mit getrennten MCC/MNC-Filtern, protokolliert Streckenpunkte, Zellanzahl, erkannte Betreiber, unbekannte Codes und Datenqualität und erfindet bei unzureichender Evidenz weiterhin keine Betreiberwerte.
+- Der produktive Server verwendet einen lokalen, API-credit-freien OpenCellID-Snapshot für MCC 262; der Datenbestand bleibt aufgrund seiner Größe und Lizenz getrennt vom Docker-Image und Repository.
+
 ## 0.2.1 - 2026-08-24
 
 - Technische Stations-, Provider- und Datenbank-IDs aus den Suchvorschlägen entfernt; angezeigt werden nur Stationsname und Ort/Land.

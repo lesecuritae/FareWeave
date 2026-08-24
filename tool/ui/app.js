@@ -289,7 +289,7 @@ function renderStationSuggestions(field, stations) {
 
 function selectStation(field, station) {
     if (station) {
-    state.stations[field] = {name:station.name, provider:station.provider, provider_id:station.provider_id, provider_ids:station.provider_ids || {[station.provider]:station.provider_id}, latitude:station.latitude, longitude:station.longitude};
+    state.stations[field] = {name:station.name, provider:station.provider, provider_id:station.provider_id, provider_ids:station.provider_ids || {[station.provider]:station.provider_id}, provider_alias_ids:station.provider_alias_ids || {}, latitude:station.latitude, longitude:station.longitude};
     $(field).value = station.name;
     $(field).dataset.selected = 'true';
     $(`${field}Suggestions`).classList.add('hidden');

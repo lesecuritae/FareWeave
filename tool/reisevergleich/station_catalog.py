@@ -12,7 +12,7 @@ from .gtfs_flix import discover_stops
 from .location_resolver import exact_location_key, location_candidates, location_key
 
 _CACHE_TTL = 300
-_RANKING_GENERATION = "stations-v3"
+_RANKING_GENERATION = "stations-v4"
 
 
 def _base_station_query(value: str) -> str:
@@ -158,11 +158,19 @@ async def _search_uncached(normalized: str, limit: int) -> dict[str, Any]:
             or (_distance_km(entry, item) is None and exact_location_key(entry["name"]) == exact_location_key(item["name"]))
         )), None)
         if group:
-            group["provider_ids"].setdefault(item["provider"], item["provider_id"])
+            provider = item["provider"]
+            group["provider_ids"].setdefault(provider, item["provider_id"])
+            aliases = group.setdefault("provider_alias_ids", {}).setdefault(provider, [])
+            if item["provider_id"] not in aliases:
+                aliases.append(item["provider_id"])
             for field in ("region", "country", "latitude", "longitude"):
                 if group.get(field) is None and item.get(field) is not None: group[field] = item[field]
             continue
-        groups.append({**item, "provider_ids": {item["provider"]: item["provider_id"]}})
+        groups.append({
+            **item,
+            "provider_ids": {item["provider"]: item["provider_id"]},
+            "provider_alias_ids": {item["provider"]: [item["provider_id"]]},
+        })
 
     ranked: list[dict[str, Any]] = []
     for item in groups[:min(max(limit, 1), 20)]:

@@ -301,10 +301,24 @@ def _search_sync(database: Path, request) -> dict[str, Any]:
         destination_selection = getattr(request, "destination_station", None)
         selected_origin = origin_selection if origin_selection and origin_selection.id_for("flix") else None
         selected_destination = destination_selection if destination_selection and destination_selection.id_for("flix") else None
-        explicit_origin_id = selected_origin.id_for("flix") if selected_origin else getattr(request, "flix_origin_stop_id", None)
-        explicit_destination_id = selected_destination.id_for("flix") if selected_destination else getattr(request, "flix_destination_stop_id", None)
-        origin_ids = [explicit_origin_id] if explicit_origin_id else ([r["stop_id"] for score, r in origins if score >= max(60, origins[0][0] - 20)][:24] if origins and origins[0][0] else [])
-        destination_ids = [explicit_destination_id] if explicit_destination_id else ([r["stop_id"] for score, r in destinations if score >= max(60, destinations[0][0] - 20)][:24] if destinations and destinations[0][0] else [])
+        explicit_origin_ids = selected_origin.ids_for("flix") if selected_origin else ([getattr(request, "flix_origin_stop_id", None)] if getattr(request, "flix_origin_stop_id", None) else [])
+        explicit_destination_ids = selected_destination.ids_for("flix") if selected_destination else ([getattr(request, "flix_destination_stop_id", None)] if getattr(request, "flix_destination_stop_id", None) else [])
+
+        def stop_families(stop_ids: list[str]) -> list[str]:
+            """Include a GTFS station, its parent and every child of that parent."""
+            expanded = {str(stop_id) for stop_id in stop_ids if stop_id}
+            pending = list(expanded)
+            while pending:
+                stop_id = pending.pop()
+                row = db.execute("SELECT parent_station FROM stop WHERE stop_id=?", (stop_id,)).fetchone()
+                parent = str(row[0]) if row and row[0] else stop_id
+                if parent not in expanded:
+                    expanded.add(parent); pending.append(parent)
+                expanded.update(str(child[0]) for child in db.execute("SELECT stop_id FROM stop WHERE parent_station=?", (parent,)))
+            return sorted(expanded)
+
+        origin_ids = stop_families(explicit_origin_ids) if explicit_origin_ids else ([r["stop_id"] for score, r in origins if score >= max(60, origins[0][0] - 20)][:24] if origins and origins[0][0] else [])
+        destination_ids = stop_families(explicit_destination_ids) if explicit_destination_ids else ([r["stop_id"] for score, r in destinations if score >= max(60, destinations[0][0] - 20)][:24] if destinations and destinations[0][0] else [])
         if not origin_ids or not destination_ids:
             return {"status": "empty", "routes": [], "candidate_routes": [], "provider_status": {"provider": "flix-gtfs", "ok": True, "error": "Start oder Ziel nicht im Flix-GTFS gefunden"}}
         placeholders_o, placeholders_d = ",".join("?" * len(origin_ids)), ",".join("?" * len(destination_ids))

@@ -16,6 +16,7 @@ class StationSelection(BaseModel):
     provider: Literal["db", "transitous", "flix"]
     provider_id: str = Field(min_length=1, max_length=240)
     provider_ids: dict[str, str] = Field(default_factory=dict)
+    provider_alias_ids: dict[str, list[str]] = Field(default_factory=dict)
     latitude: float | None = Field(default=None, ge=-90, le=90)
     longitude: float | None = Field(default=None, ge=-180, le=180)
 
@@ -26,10 +27,20 @@ class StationSelection(BaseModel):
             if key in {"db", "transitous", "flix"} and isinstance(value, str) and value.strip()
         }
         self.provider_ids[self.provider] = self.provider_id
+        self.provider_alias_ids = {
+            key: list(dict.fromkeys(str(item).strip() for item in values if str(item).strip()))
+            for key, values in self.provider_alias_ids.items()
+            if key in {"db", "transitous", "flix"} and isinstance(values, list)
+        }
+        for key, value in self.provider_ids.items():
+            self.provider_alias_ids[key] = list(dict.fromkeys([value, *self.provider_alias_ids.get(key, [])]))
         return self
 
     def id_for(self, provider: str) -> str | None:
         return self.provider_ids.get(provider)
+
+    def ids_for(self, provider: str) -> list[str]:
+        return self.provider_alias_ids.get(provider) or ([self.provider_ids[provider]] if provider in self.provider_ids else [])
 
 
 def _future_or_today(value: str | None, field_name: str) -> str | None:

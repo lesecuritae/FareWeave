@@ -1,3 +1,7 @@
+import asyncio
+import tempfile
+from pathlib import Path
+
 from reisevergleich.coverage import opencellid
 
 
@@ -51,8 +55,38 @@ def test_sparse_opencellid_data_is_not_presented_as_coverage():
     assert opencellid.calculate(points, [cell(1, 51.0, 10.0, 1)]) == []
 
 
+def test_csv_pipeline_reports_route_debug_and_unknown_codes():
+    with tempfile.TemporaryDirectory() as directory:
+        source = Path(directory) / "cells.csv"
+        source.write_text(
+            "radio,mcc,net,area,cell,lon,lat,range\n"
+            "LTE,262,1,1,101,12.382,51.345,3000\n"
+            "LTE,262,2,1,201,12.383,51.346,3000\n"
+            "NR,262,3,1,301,12.381,51.344,3000\n"
+            "LTE,262,99,1,999,12.380,51.343,3000\n",
+            encoding="utf-8",
+        )
+        previous = opencellid.CSV_PATH
+        opencellid.CSV_PATH = str(source)
+        try:
+            points = [
+                point("Leipzig Hbf", 51.345, 12.382, 0),
+                point("Leipzig Zentrum", 51.346, 12.383, 1),
+            ]
+            result = asyncio.run(opencellid.sample_operators(points))
+        finally:
+            opencellid.CSV_PATH = previous
+    assert result["debug"] == {
+        "source": "csv", "evaluated_points": 2, "cells_found": 3,
+        "recognized_operators": ["Telekom", "Vodafone", "Telefónica/O2"],
+        "unknown_mcc_mnc": ["262-99"], "api_errors": 0, "data_quality": "good",
+    }
+    assert {item["name"] for item in result["networks"]} == {"Telekom", "Vodafone", "Telefónica/O2"}
+
+
 if __name__ == "__main__":
     test_german_mcc_mnc_mapping_rejects_other_providers()
     test_leipzig_halle_kassel_uses_complete_route_and_detects_gaps()
     test_sparse_opencellid_data_is_not_presented_as_coverage()
+    test_csv_pipeline_reports_route_debug_and_unknown_codes()
     print("OpenCellID Betreiber-, Vollstrecken- und Qualitätsregression: OK")

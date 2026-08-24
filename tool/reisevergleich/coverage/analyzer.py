@@ -50,7 +50,9 @@ async def analyze_route(route: dict[str, Any]) -> dict[str, Any]:
                 return {"status": "unavailable", "message": "Mobilfunkanalyse momentan nicht verfügbar", "reason": "route_geometry_missing"}
             identifier = route_hash(points)
             coverage = await asyncio.wait_for(sample(points), timeout=12)
-            operator_networks = await asyncio.wait_for(sample_operators(points), timeout=20)
+            operator_sample = await asyncio.wait_for(sample_operators(points), timeout=25)
+            operator_networks = operator_sample.get("networks") or []
+            operator_debug = operator_sample.get("debug") or {}
             networks: list[dict[str, Any]] = []
             evaluated_union = sum(
                 any(coverage[key][index] is not None for key in PROVIDERS)
@@ -86,6 +88,7 @@ async def analyze_route(route: dict[str, Any]) -> dict[str, Any]:
                     "cell_count": sum(item.get("cell_count", 0) for item in operator_networks),
                     "data_quality": ("good" if operator_networks and all(item.get("data_quality") == "good" for item in operator_networks) else "limited" if operator_networks else "insufficient"),
                     "message": "Betreiberdaten nicht verfügbar" if not operator_networks else None,
+                    "debug": operator_debug,
                 },
                 "tunnels": {"status": "not_available", "message": "Tunnel werden von der Abdeckungsquelle nicht separat ausgewiesen."},
                 "method": "Konservative Mindestanzahl breitbandiger Netze aus 4G-/5G-Betreiberzahlen; Outdoor-Prognose, Verlauf zwischen Halten interpoliert.",
