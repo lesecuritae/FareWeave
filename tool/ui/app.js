@@ -16,6 +16,7 @@ let calendarMonth = new Date();
 let activeSearch = null;
 let coverageQueue = [];
 let coverageGeneration = 0;
+let activeCalendarSearch = null;
 const progressLabels = {db:'Deutsche Bahn', transitous:'Transitous', gtfs:'GTFS-Fahrplan', flixbus:'FlixBus', flixtrain:'FlixTrain', merge:'Ergebnisaufbereitung'};
 const statusLabels = {waiting:'wartet', loading:'wird geladen', processing:'wird verarbeitet', completed:'abgeschlossen', empty:'keine Ergebnisse', failed:'fehlgeschlagen', cancelled:'abgebrochen'};
 
@@ -96,6 +97,7 @@ function syncJourneyDates() {
 
 function syncTravelMode() {
   const isGround = state.travelMode === 'ground';
+  document.querySelectorAll('.ground-only').forEach(element => element.classList.toggle('hidden', !isGround));
   document.getElementById("lodgingPanel").classList.toggle("hidden", isGround || state.journeyType === 'one_way');
   document.getElementById('ticketPanel').classList.toggle('hidden', state.travelMode === 'flight_stay');
   document.querySelectorAll('.flight-option').forEach(option => {
@@ -107,6 +109,74 @@ function syncTravelMode() {
   document.querySelectorAll('[data-dticket]').forEach(button => { button.disabled = state.travelMode === 'flight_stay'; });
   document.getElementById('destinationTransfer').disabled = isGround;
   syncDticket();
+}
+
+function selectedCalendarDays() {
+  const preset = $('priceCalendarPreset').value;
+  return preset === 'custom' ? Number($('priceCalendarCustom').value) : Number(preset);
+}
+
+function setDepartureDate(value) {
+  const nights = dateDifferenceInDays($('departureDate').value, $('returnDate').value);
+  $('departureDate').value = value;
+  if (nights !== null && nights > 0) {
+    const nextReturn = new Date(`${value}T12:00:00`);
+    nextReturn.setDate(nextReturn.getDate() + nights);
+    $('returnDate').value = localIso(nextReturn);
+  }
+  syncJourneyDates();
+  refreshFlixStops();
+  renderCalendar();
+}
+
+function renderPriceCalendar(data) {
+  const rows = (data.days || []).map(day => {
+    const price = day.price_available ? money(day.price, day.currency || 'EUR') : 'Preis offen';
+    const stateLabel = day.status === 'failed' ? 'Fehlgeschlagen' : day.connection_count ? `${day.connection_count} Verbindungen` : 'Keine Verbindung';
+    return `<button type="button" class="price-calendar-day ${day.cheapest ? 'cheapest' : ''}" data-price-date="${esc(day.date)}"><span>${dateText(day.date)}</span><strong>${esc(price)}</strong><small>${esc(stateLabel)}</small>${day.cheapest ? '<b>Günstigster Tag</b>' : ''}</button>`;
+  }).join('');
+  $('priceCalendarResults').innerHTML = `<div class="price-calendar-heading"><div><span class="eyebrow">Flexible Preissuche</span><h2>${esc(data.origin)} → ${esc(data.destination)}</h2></div><span>${esc(data.calendar_days)} Tage</span></div><div class="price-calendar-days">${rows}</div><p class="meta">Aktuelle Preise aus den bestehenden DB-, Transitous- und Flix-Adaptern. „Preis offen“ bedeutet, dass nur Fahrplandaten vorliegen.</p>`;
+  $('priceCalendarResults').classList.remove('hidden');
+  $('priceCalendarResults').querySelectorAll('[data-price-date]').forEach(button => button.addEventListener('click', () => {
+    setDepartureDate(button.dataset.priceDate);
+    $('searchForm').requestSubmit();
+  }));
+}
+
+async function loadPriceCalendar() {
+  if (state.travelMode !== 'ground' || !state.stations.origin || !state.stations.destination) {
+    showMessage('Bitte Start und Ziel aus der Stationsliste auswählen.', 'error');
+    return;
+  }
+  const days = selectedCalendarDays();
+  if (!Number.isInteger(days) || days < 1 || days > 14) {
+    showMessage('Der Preisvergleich ist auf 1 bis 14 Tage begrenzt.', 'error');
+    return;
+  }
+  if (activeCalendarSearch) activeCalendarSearch.abort();
+  const controller = new AbortController();
+  activeCalendarSearch = controller;
+  const button = $('priceCalendarButton');
+  button.disabled = true;
+  button.innerHTML = '<span class="spinner"></span>Preise werden geladen';
+  hideMessage();
+  try {
+    const response = await fetch('/api/price-calendar', {
+      method:'POST', headers:{'Content-Type':'application/json'}, signal:controller.signal,
+      body:JSON.stringify({...getPayload(), calendar_days:days}),
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.detail ? JSON.stringify(data.detail) : `HTTP ${response.status}`);
+    if (activeCalendarSearch === controller) renderPriceCalendar(data);
+  } catch (error) {
+    if (error.name !== 'AbortError') showMessage(`Flexible Preissuche fehlgeschlagen: ${error.message}`, 'error');
+  } finally {
+    if (activeCalendarSearch === controller) {
+      activeCalendarSearch = null;
+      button.disabled = false;
+      button.textContent = 'Preise vergleichen';
+    }
+  }
 }
 
 function syncDticket() {
@@ -548,6 +618,8 @@ function bind() {
   syncHotelType();
   bindStationInput('origin');
   bindStationInput('destination');
+  $('priceCalendarPreset').addEventListener('change', () => $('priceCalendarCustom').classList.toggle('hidden', $('priceCalendarPreset').value !== 'custom'));
+  $('priceCalendarButton').addEventListener('click', loadPriceCalendar);
   document.querySelectorAll('[data-mode]').forEach(btn => btn.addEventListener('click', () => {
     state.travelMode = btn.dataset.mode;
     document.querySelectorAll('[data-mode]').forEach(x => x.classList.toggle('active', x===btn));

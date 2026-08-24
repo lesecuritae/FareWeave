@@ -387,6 +387,18 @@ class TripRequest(BaseModel):
         return self.feeder_preference
 
 
+class PriceCalendarRequest(TripRequest):
+    """A bounded multi-day comparison using the regular ground search."""
+
+    calendar_days: int = Field(default=7, ge=1, le=14)
+
+    @model_validator(mode="after")
+    def ground_only(self):
+        if self.travel_mode != "ground":
+            raise ValueError("Die flexible Preissuche ist nur für Bodenreisen verfügbar")
+        return self
+
+
 class CoverageRequest(BaseModel):
     """Provider-neutral route snapshot used by the optional coverage analyzer."""
 

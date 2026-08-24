@@ -6,6 +6,7 @@ __pycache__/
 *.pyc
 *.pyo
 .pytest_cache/
+.browser-artifacts/
 .coverage
 htmlcov/
 backups/

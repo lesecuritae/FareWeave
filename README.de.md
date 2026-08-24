@@ -8,7 +8,7 @@
 
 Bahn, Deutschlandticket, Split-Tickets, FlixTrain, FlixBus, Flüge, Flughafenzubringer, Transfers und Unterkünfte landen in einer gemeinsamen Planung. FareWeave schaut dabei nicht nur, ob irgendwo ein günstiger Preis auftaucht. Die einzelnen Teile müssen zeitlich und logisch zusammenpassen.
 
-Aktuelle Version: **0.1.1**
+Aktuelle Version: **0.2.0**
 
 FareWeave verkauft und bucht selbst nichts. Wenn ein Provider einen brauchbaren Angebotslink liefert, kann er direkt aus dem Ergebnis geöffnet werden. Wo kein direkter Link vorhanden ist, gibt es an passenden Stellen einen manuellen Gegencheck, etwa bei der Deutschen Bahn, Google Flights, Google Hotels oder Google Maps. Preis und Verfügbarkeit werden beim eigentlichen Anbieter noch einmal geprüft.
 
@@ -98,11 +98,11 @@ trvl liefert an ausgewählten Stellen Daten. FareWeave entscheidet anschließend
 
 Die Flugabfragen laufen bewusst providerweise und mit eigenen Zeitlimits. Ein langsamer oder kaputter Provider soll nicht die komplette Reiseplanung blockieren.
 
-In FareWeave 0.1.1 werden zuerst **Skiplagged, Ryanair, Vueling und easyJet** abgefragt. Reichen die Ergebnisse nicht aus, folgen **Transavia, Norwegian, Air France/KLM und Wizz Air**.
+In FareWeave 0.2.0 werden zuerst **Skiplagged, Ryanair, Vueling und easyJet** abgefragt. Reichen die Ergebnisse nicht aus, folgen **Transavia, Norwegian, Air France/KLM und Wizz Air**.
 
 Die trvl-Sammelabfrage wird dafür nicht einfach unbeschränkt durchgereicht. FareWeave fragt die benötigten Provider isoliert ab, führt brauchbare Ergebnisse zusammen und verwirft chronologisch unplausible Flüge.
 
-Google Flights ist zusätzlich als manueller Gegencheck eingebaut. Es handelt sich in FareWeave 0.1.1 dabei **nicht um einen eigenen automatischen Google-Flights-Provider**, sondern um einen passenden Suchlink für die betreffende Strecke und die gewählten Reisedaten.
+Google Flights ist zusätzlich als manueller Gegencheck eingebaut. Es handelt sich in FareWeave 0.2.0 dabei **nicht um einen eigenen automatischen Google-Flights-Provider**, sondern um einen passenden Suchlink für die betreffende Strecke und die gewählten Reisedaten.
 
 ## Transfers und öffentlicher Verkehr
 
@@ -355,13 +355,17 @@ docker compose build
 docker compose up -d
 ```
 
-trvl ist über `TRVL_REF` gepinnt; FareWeave 0.1.1 verwendet standardmäßig `v1.21.4`.
+trvl ist über `TRVL_REF` gepinnt; FareWeave 0.2.0 verwendet standardmäßig `v1.21.4`.
 
 ## Eindeutige Stationsauswahl
 
 Bei Bahn- und Busreisen sucht FareWeave Start und Ziel parallel in den vorhandenen DB-Stationsdaten, im internationalen Transitous-Verzeichnis und im bereits geladenen Flix-GTFS. Treffer desselben Halts werden über ihre Koordinaten gruppiert; die Auswahl speichert die nativen IDs je Provider im aktuellen Suchrequest. Dadurch müssen DB, Transitous und Flix einen gewählten Halt nicht erneut aus ähnlich klingendem Freitext erraten. TRVL erhält denselben bestätigten Namen und bleibt für seine Providerpfade kompatibel.
 
 Exakte Stationsnamen und eindeutige Aliase werden automatisch bestätigt. Nur bei echter geografischer Mehrdeutigkeit erscheint eine Auswahl mit Region/Land, beispielsweise für Wien in Österreich gegenüber Vienna in Virginia. Ohne diese Bestätigung beginnt keine Bodenreisesuche. Die Auflösung liegt fünf Minuten im bestehenden SQLite/WAL-Komponentencache; es wird keine zweite Stationsdatenbank gepflegt.
+
+## Flexible Preissuche
+
+Für Bodenreisen kann FareWeave ab dem gewählten Abreisetag aktuelle Verbindungen und Preise über 3, 7 oder individuell bis maximal 14 Tage vergleichen. Jeder Tag läuft durch dieselben DB-, Transitous-, Flix- und TRVL-Bodenadapter wie eine normale Suche. Der günstigste belegte Tagespreis wird markiert; wenn ein Provider nur Fahrplandaten liefert, zeigt die Oberfläche ausdrücklich „Preis offen“. Ein ausgewählter Tag wird anschließend über die normale Detailreise geladen. Die bestehende Reisedauer bleibt dabei erhalten. Der Journey-/Provider-Cache wird wiederverwendet und der Kalender führt höchstens zwei Tagesabfragen gleichzeitig aus.
 
 ## Mobilfunkabdeckung entlang der Fahrt
 

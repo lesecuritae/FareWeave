@@ -7,7 +7,7 @@ from typing import Any
 from .cache import begin_scope, end_scope, get_cached_journey, save_journey, stats as cache_stats
 from .compare import compare_ground_round_trip
 from .config import TRIP_TIMEOUT, today_iso
-from .models import TripRequest
+from .models import PriceCalendarRequest, TripRequest
 from .planner import complete_trip
 from .presentation import public_result
 
@@ -88,3 +88,66 @@ async def search(request: TripRequest) -> dict[str, Any]:
         return public_result(result)
     finally:
         end_scope(token)
+
+
+def _calendar_day(result: dict[str, Any], travel_date: str) -> dict[str, Any]:
+    context = result.get("response_context") or {}
+    outbound = context.get("outbound") or {}
+    connections = outbound.get("connections") or []
+    priced: list[tuple[float, str]] = []
+    summary = context.get("price_summary") or {}
+    round_trip = bool((context.get("route") or {}).get("return_date"))
+    summary_price = summary.get("round_trip_live_price") if round_trip else summary.get("known_total_price", summary.get("outbound_live_price"))
+    if isinstance(summary_price, (int, float)) and (not round_trip or summary.get("complete") is True):
+        priced.append((float(summary_price), str(summary.get("currency") or "EUR")))
+    elif not round_trip:
+        for connection in connections:
+            if connection.get("deutschlandticket_covered") is True:
+                priced.append((0.0, "EUR"))
+            elif isinstance(connection.get("price"), (int, float)):
+                priced.append((float(connection["price"]), str(connection.get("currency") or "EUR")))
+    cheapest = min(priced, key=lambda item: item[0]) if priced else None
+    return {
+        "date": travel_date,
+        "status": "available" if connections else "unavailable",
+        "connection_count": len(connections),
+        "price": round(cheapest[0], 2) if cheapest else None,
+        "currency": cheapest[1] if cheapest else None,
+        "price_available": cheapest is not None,
+        "cache_hit": bool((result.get("cache") or {}).get("journey_hit")),
+    }
+
+
+async def price_calendar(request: PriceCalendarRequest) -> dict[str, Any]:
+    """Compare up to 14 dates without bypassing normal routing or price adapters."""
+    start = date.fromisoformat(request.departure_date)
+    original_return = date.fromisoformat(request.return_date) if request.return_date else None
+    semaphore = asyncio.Semaphore(2)
+
+    async def one_day(offset: int) -> dict[str, Any]:
+        outbound = start + timedelta(days=offset)
+        updates: dict[str, Any] = {"departure_date": outbound.isoformat()}
+        if original_return:
+            updates["return_date"] = (original_return + timedelta(days=offset)).isoformat()
+        day_request = TripRequest.model_validate(request.model_dump(exclude={"calendar_days"}) | updates)
+        async with semaphore:
+            try:
+                return _calendar_day(await search(day_request), outbound.isoformat())
+            except Exception:
+                return {
+                    "date": outbound.isoformat(), "status": "failed", "connection_count": 0,
+                    "price": None, "currency": None, "price_available": False,
+                    "error": "Tagesabfrage fehlgeschlagen.",
+                }
+
+    days = await asyncio.gather(*(one_day(offset) for offset in range(request.calendar_days)))
+    priced_days = [item for item in days if item["price_available"]]
+    cheapest_date = min(priced_days, key=lambda item: (item["price"], item["date"]))["date"] if priced_days else None
+    for item in days:
+        item["cheapest"] = item["date"] == cheapest_date
+    return {
+        "status": "ok" if any(item["status"] == "available" for item in days) else "unavailable",
+        "origin": request.origin, "destination": request.destination,
+        "start_date": request.departure_date, "calendar_days": request.calendar_days,
+        "cheapest_date": cheapest_date, "days": days,
+    }

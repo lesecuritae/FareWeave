@@ -29,7 +29,7 @@ for needle in [
     'id="dticketOnly"',
 ]:
     assert needle in html
-for needle in ["deutschlandticket", "D-Ticket", "Günstigste", "Schnellste", "/api/search"]:
+for needle in ["deutschlandticket", "D-Ticket", "Günstigste", "Schnellste", "/api/search", "/api/price-calendar", "priceCalendarPreset"]:
     assert needle in js
 for needle in [
     "deutschlandticket_only:",

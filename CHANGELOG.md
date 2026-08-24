@@ -1,4 +1,13 @@
 # Changelog
+## 0.2.0 - 2026-08-24
+
+- Flexible Preissuche für Bodenreisen über 3, 7 oder individuell 1 bis maximal 14 aufeinanderfolgende Reisetage.
+- Tagespreise werden ausschließlich aus den bestehenden DB-, Transitous-, Flix- und TRVL-Bodenpfaden gewonnen; Fahrplan und Preisadapter bleiben unverändert.
+- Der günstigste Tag wird sichtbar markiert, während fehlende Preise ausdrücklich als „Preis offen“ erscheinen und nicht geschätzt werden.
+- Die Rückreise wird bei einer Tagesauswahl um denselben Abstand verschoben, sodass die gewählte Reisedauer erhalten bleibt.
+- Mehrtagesabfragen nutzen den bestehenden Journey-/Provider-Cache und sind auf zwei parallele Tagesläufe begrenzt.
+- Responsive Kalenderkarten und direkte Tagesauswahl wurden für Desktop- und Mobilansichten ergänzt.
+
 ## 0.1.1 - 2026-08-24
 
 - Föderierter Stationskatalog aus vorhandenen DB-, Transitous- und Flix-GTFS-Quellen; keine redundante Stationsdatenbank.
