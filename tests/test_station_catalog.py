@@ -125,6 +125,7 @@ def test_known_central_station_names_have_no_secondary_penalty():
         assert station_catalog._station_role_score(name) < 0
     assert station_catalog._station_role_score("München Ost", {"modes":["LONG_DISTANCE"]}) > station_catalog._station_role_score("München Harras", {"modes":["SUBURBAN"]})
     assert station_catalog._station_role_score("Görlitz", {"modes":["REGIONAL_RAIL"]}) > station_catalog._station_role_score("Görlitz (bus station)", {"modes":["COACH"]})
+    assert station_catalog._station_role_score("Görlitz, Bahnhof", {"modes":["REGIONAL_RAIL"]}) > station_catalog._station_role_score("Görlitz Hp Rauschwalde", {"modes":["REGIONAL_RAIL"]})
 
 
 def test_catalog_keeps_multiple_flix_ids_for_one_station_complex(monkeypatch):

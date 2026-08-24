@@ -12,7 +12,7 @@ from .gtfs_flix import discover_stops
 from .location_resolver import exact_location_key, has_airport_context, location_candidates, location_key
 
 _CACHE_TTL = 300
-_RANKING_GENERATION = "stations-v9"
+_RANKING_GENERATION = "stations-v10"
 
 
 def _base_station_query(value: str) -> str:
@@ -39,6 +39,8 @@ _SECONDARY_STATION_WORDS = {
 def _station_role_score(name: str, item: dict[str, Any] | None = None) -> int:
     words = set(exact_location_key(name).replace("-", " ").split())
     score = 400 if words & {"hbf", "hauptbahnhof", "central", "centrale", "centraal"} else 0
+    if "bahnhof" in words:
+        score += 220
     if words & _SECONDARY_STATION_WORDS:
         score -= 350
     item = item or {}
