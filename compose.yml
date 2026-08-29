@@ -23,7 +23,7 @@ services:
     container_name: fareweave-db-api
     environment:
       PORT: "3001"
-      USER_AGENT: fareweave/0.2.8
+      USER_AGENT: fareweave/0.3.0
       DB_CFFI_BRIDGE_URL: http://app:8000/internal/db-cffi/request
       DB_CFFI_TOKEN: "${DB_CFFI_TOKEN:-}"
       DB_CFFI_TOKEN_FILE: /run/fareweave-secrets/db_cffi_token
@@ -89,6 +89,9 @@ services:
       FLIX_GTFS_DIR: /var/lib/reisevergleich/flix-gtfs
       FLIX_GTFS_MAX_AGE: "86400"
       FLIX_GTFS_TIMEOUT: "30"
+      NINA_API_URL: "${NINA_API_URL:-https://warnung.bund.de/api31}"
+      NINA_TIMEOUT: "${NINA_TIMEOUT:-12}"
+      NINA_CACHE_TTL: "${NINA_CACHE_TTL:-300}"
       TRANSFER_PROVIDER_TIMEOUT: "20"
       TRANSFER_PROVIDER_CONCURRENCY: "2"
       TRANSITOUS_TIMEOUT: "25"

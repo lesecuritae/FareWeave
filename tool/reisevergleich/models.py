@@ -43,6 +43,23 @@ class StationSelection(BaseModel):
         return self.provider_alias_ids.get(provider) or ([self.provider_ids[provider]] if provider in self.provider_ids else [])
 
 
+class WarningRouteRequest(BaseModel):
+    routes: list[dict[str, Any]] = Field(min_length=1, max_length=8)
+
+
+class TravelWarning(BaseModel):
+    id: str
+    title: str
+    description: str | None = None
+    location: str | None = None
+    severity: str | None = None
+    source: Literal["NINA/BBK"] = "NINA/BBK"
+    issuer: str | None = None
+    starts_at: str | None = None
+    expires_at: str | None = None
+    affected_stops: list[str] = Field(default_factory=list)
+
+
 def _future_or_today(value: str | None, field_name: str) -> str | None:
     if value is None:
         return None

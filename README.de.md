@@ -8,7 +8,7 @@
 
 Bahn, Deutschlandticket, Split-Tickets, FlixTrain, FlixBus, Flüge, Flughafenzubringer, Transfers und Unterkünfte landen in einer gemeinsamen Planung. FareWeave schaut dabei nicht nur, ob irgendwo ein günstiger Preis auftaucht. Die einzelnen Teile müssen zeitlich und logisch zusammenpassen.
 
-Aktuelle Version: **0.2.8**
+Aktuelle Version: **0.3.0**
 
 FareWeave verkauft und bucht selbst nichts. Wenn ein Provider einen brauchbaren Angebotslink liefert, kann er direkt aus dem Ergebnis geöffnet werden. Wo kein direkter Link vorhanden ist, gibt es an passenden Stellen einen manuellen Gegencheck, etwa bei der Deutschen Bahn, Google Flights, Google Hotels oder Google Maps. Preis und Verfügbarkeit werden beim eigentlichen Anbieter noch einmal geprüft.
 
@@ -81,6 +81,12 @@ FareWeave kann Flix außerdem in gemischten Reiseketten verwenden. Ein Beispiel 
 Bei abweichenden tatsächlichen Flix-Halten kann FareWeave passende Zu- und Abbringer einbeziehen. Die Oberfläche bietet standardmäßig eine automatische Haltestellenwahl; alternativ kann ein aktuell vom Provider gelieferter konkreter Halt verbindlich ausgewählt werden.
 
 Auch hier werden die zusätzlichen Kosten nur dort angesetzt, wo tatsächlich ein weiteres Ticket gebraucht wird.
+
+## Aktuelle Warnungen entlang der Reise
+
+Nach einer erfolgreichen Suche lädt FareWeave aktuelle amtliche Warnungen von NINA/BBK separat nach. Berücksichtigt werden Start, Ziel, koordinierte wichtige Zwischenhalte und Flughäfen der angezeigten Reise. Eine Warnung erscheint nur, wenn ihre amtliche Geometrie einen dieser Punkte tatsächlich umfasst; unspezifische deutschlandweite Meldungen werden nicht als Reisehinweis übernommen. Flughafenwarnungen sind reine Ortsinformationen und bedeuten nicht automatisch, dass eine dort verkehrende Bahn-, Bus- oder Flugverbindung betroffen ist.
+
+Die Warnungen verändern weder Verbindung, Ranking noch Preis und lösen keine automatische Umplanung aus. Listen, Geometrien und Details werden fünf Minuten gecacht. Ist der Dienst nicht erreichbar oder liegt keine passende Warnung vor, bleibt die Reiseausgabe unverändert.
 
 ## Warum trvl drin ist
 
@@ -355,7 +361,7 @@ docker compose build
 docker compose up -d
 ```
 
-trvl ist über `TRVL_REF` gepinnt; FareWeave 0.2.0 verwendet standardmäßig `v1.21.4`.
+trvl ist über `TRVL_REF` gepinnt; FareWeave 0.3.0 verwendet standardmäßig `v1.21.4`.
 
 ## Eindeutige Stationsauswahl
 

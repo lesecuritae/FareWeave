@@ -515,6 +515,60 @@ async function loadCoverage() {
   await Promise.all(Array.from({length: Math.min(3, queue.length)}, worker));
 }
 
+function warningRoutes(context) {
+  const routes = [];
+  for (const direction of [context?.outbound, context?.return]) {
+    routes.push(...(direction?.connections || []).slice(0, 3));
+  }
+  for (const feeder of [context?.outbound_feeder, context?.return_feeder]) {
+    const selected = feeder?.selected;
+    if (selected?.segments?.length) routes.push({segments:selected.segments});
+  }
+  const flight = context?.flight;
+  for (const direction of [flight?.outbound, flight?.return]) {
+    if (!direction?.from || !direction?.to) continue;
+    routes.push({
+      warning_geocode: true,
+      origin: {name:`Flughafen ${direction.from}`},
+      destination: {name:`Flughafen ${direction.to}`},
+    });
+  }
+  return routes.slice(0, 8);
+}
+
+function warningResultHtml(data) {
+  const warnings = data?.warnings || [];
+  if (!warnings.length) return '';
+  const items = warnings.map(warning => {
+    const affected = (warning.affected_stops || []).length ? ` · ${warning.affected_stops.join(', ')}` : '';
+    const location = warning.location ? `<div class="warning-location">${esc(warning.location)}${esc(affected)}</div>` : (affected ? `<div class="warning-location">${esc(affected.slice(3))}</div>` : '');
+    return `<article class="travel-warning"><div class="warning-icon" aria-hidden="true">⚠</div><div><strong>${esc(warning.title)}</strong>${warning.description ? `<p>${esc(warning.description)}</p>` : ''}${location}<div class="meta">Quelle: NINA/BBK${warning.issuer ? ` · ${esc(warning.issuer)}` : ''}</div></div></article>`;
+  }).join('');
+  return `<section class="warning-panel"><div class="warning-heading"><span aria-hidden="true">⚠</span><h2>Aktuelle Warnungen entlang der Reise</h2></div>${items}</section>`;
+}
+
+async function loadWarnings(context) {
+  const target = $('travelWarnings');
+  if (!target) return;
+  const routes = warningRoutes(context);
+  if (!routes.length) return;
+  try {
+    const response = await fetch('/api/warnings', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({routes}),
+    });
+    if (!response.ok) return;
+    const content = warningResultHtml(await response.json());
+    if (content) {
+      target.innerHTML = content;
+      target.classList.remove('hidden');
+    }
+  } catch (_) {
+    // Warnungen sind additive Informationen und dürfen die Reise nie stören.
+  }
+}
+
 function groundConnectionsHtml(title, component) {
   const connections = component?.connections || [];
   if (!connections.length) {
@@ -560,7 +614,7 @@ function render(data) {
   const cost = r.cost_summary || r.price_summary || {};
   const subtotal = cost.known_subtotal ?? cost.known_total_price ?? cost.round_trip_live_price;
   const complete = cost.complete ?? cost.total_price_complete;
-  let html = `<article class="summary-card"><div><h2>${esc(route.origin || $('origin').value)} → ${esc(route.destination || $('destination').value)}</h2><p>${dateText(route.outbound_date)}${route.return_date ? ` bis ${dateText(route.return_date)}` : ''}${route.stay_nights ? ` · ${route.stay_nights} Nächte` : ''}${state.dticket ? ' · Deutschlandticket: Ja' : ' · Deutschlandticket: Nein'}</p></div><div class="total"><strong>${subtotal !== undefined ? money(subtotal, cost.currency || 'EUR') : '–'}</strong><span>${complete ? 'bekannte Gesamtkosten' : 'bekannte Teilsumme'}</span></div></article>`;
+  let html = `<article class="summary-card"><div><h2>${esc(route.origin || $('origin').value)} → ${esc(route.destination || $('destination').value)}</h2><p>${dateText(route.outbound_date)}${route.return_date ? ` bis ${dateText(route.return_date)}` : ''}${route.stay_nights ? ` · ${route.stay_nights} Nächte` : ''}${state.dticket ? ' · Deutschlandticket: Ja' : ' · Deutschlandticket: Nein'}</p></div><div class="total"><strong>${subtotal !== undefined ? money(subtotal, cost.currency || 'EUR') : '–'}</strong><span>${complete ? 'bekannte Gesamtkosten' : 'bekannte Teilsumme'}</span></div></article><div id="travelWarnings" class="hidden"></div>`;
 
   if (data.search_mode === 'ground_trip') {
     const out = r.outbound || {}, back = r.return || {}, dt = r.deutschlandticket || {};
@@ -582,6 +636,7 @@ function render(data) {
   $('results').innerHTML = html;
   $('results').className = 'results';
   if (data.search_mode === 'ground_trip') loadCoverage();
+  loadWarnings(r);
 
   document.querySelectorAll('.feeder-card').forEach(card => {
     const views = JSON.parse(card.dataset.feeder || '{}');

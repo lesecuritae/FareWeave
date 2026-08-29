@@ -258,6 +258,14 @@ body {
 .coverage-meter i { display:block; height:100%; border-radius:inherit; background:linear-gradient(90deg,#e0a119,#18a999); }
 .coverage-network details { margin-top:5px; color:var(--muted); font-size:16px; }
 .coverage-network ul { margin:6px 0 0; padding-left:20px; }
+.warning-panel { margin:14px 0; padding:16px; border:1px solid #e5b95f; border-radius:14px; background:#fff9e9; }
+.warning-heading { display:flex; gap:9px; align-items:center; margin-bottom:10px; color:#744b00; }
+.warning-heading h2 { margin:0; font-size:20px; }
+.travel-warning { display:grid; grid-template-columns:30px minmax(0,1fr); gap:10px; padding:11px 0; border-top:1px solid #efdba9; }
+.travel-warning:first-of-type { border-top:0; }
+.travel-warning p { margin:5px 0; }
+.warning-icon { font-size:22px; line-height:1; }
+.warning-location { margin-top:4px; color:#744b00; font-size:16px; }
 @media (max-width:620px) {
   .coverage-heading { align-items:flex-start; flex-direction:column; gap:2px; }
   .coverage-panel { padding:12px; }

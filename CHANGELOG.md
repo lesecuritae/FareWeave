@@ -1,4 +1,14 @@
 # Changelog
+## 0.3.0 - 2026-08-29
+
+- Aktuelle amtliche NINA-/BBK-Warnungen werden nach einer erfolgreichen Reise separat und ohne Einfluss auf Routing, Ranking oder Preise geladen.
+- FareWeave ordnet Warnungen anhand ihrer amtlichen GeoJSON-Flächen den vorhandenen Koordinaten von Start, Ziel und wichtigen Zwischenhalten zu.
+- Unspezifische deutschlandweite Warnflächen werden nicht als reisebezogene Meldung angezeigt.
+- Die Oberfläche zeigt relevante Warnungen mit Symbol, Titel, Kurzbeschreibung, Region, betroffenen Halten und Quelle; bei keiner Warnung oder einem API-Ausfall bleibt sie unverändert.
+- Bei Flugabschnitten werden trvl-IATA-Codes gezielt über den vorhandenen Haltestellenresolver geografisch aufgelöst, damit ortsbezogene Warnungen an deutschen Flughäfen ebenfalls erfasst werden.
+- Flughafenwarnungen bleiben reine Ortsinformationen und treffen keine Aussage über die betriebliche Betroffenheit einzelner Bahn-, Bus- oder Flugverbindungen.
+- Kartenlisten, Warngeometrien und Details nutzen den bestehenden SQLite-Komponentencache mit fünf Minuten TTL und begrenzter Parallelität.
+
 ## 0.2.8 - 2026-08-29
 
 - Mehrteilige FlixTrain-Liveverbindungen lösen technische Stop-UUIDs deterministisch über den vorhandenen Flix-GTFS-Katalog auf.

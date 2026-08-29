@@ -9,8 +9,9 @@ from fastapi import APIRouter, Header, HTTPException, Query
 from .airports import AIRPORT_CITY_NAMES, AIRPORT_STATIONS
 from .cache import health as cache_health
 from .config import APP_VERSION, DB_API_URL, TRANSITOUS_URL, TRANSITOUS_USER_AGENT, today_iso
-from .models import CoverageRequest, PriceCalendarRequest, ReiseRequest, TripRequest
+from .models import CoverageRequest, PriceCalendarRequest, ReiseRequest, TripRequest, WarningRouteRequest
 from .coverage import analyze_route
+from .warnings import warnings_for_routes
 from .service import price_calendar, search
 from .progress import begin as begin_progress, end as end_progress, get as get_progress, valid_search_id
 from .gtfs_flix import discover_stops as discover_gtfs_flix_stops
@@ -54,6 +55,11 @@ async def coverage(request: CoverageRequest) -> dict[str, Any]:
     return await analyze_route(request.route)
 
 
+@router.post("/api/warnings", summary="Aktuelle NINA-/BBK-Warnungen entlang einer Reise")
+async def travel_warnings(request: WarningRouteRequest) -> dict[str, Any]:
+    return await warnings_for_routes(request.routes)
+
+
 @router.post("/api/price-calendar", summary="Aktuelle Bodenreise-Preise über mehrere Tage vergleichen")
 async def flexible_price_calendar(request: PriceCalendarRequest) -> dict[str, Any]:
     return await price_calendar(request)
@@ -94,7 +100,7 @@ async def health() -> dict[str, Any]:
         "version": APP_VERSION,
         "current_date": today_iso(),
         "architecture": "deterministic",
-        "providers": ["DB/db-vendo", "Transitous", "Flix", "trvl", "BNetzA Mobilfunk-Monitoring", "OpenCellID"],
+        "providers": ["DB/db-vendo", "Transitous", "Flix", "trvl", "NINA/BBK", "BNetzA Mobilfunk-Monitoring", "OpenCellID"],
     }
 
 

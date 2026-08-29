@@ -10,6 +10,8 @@ assert "search_trip" in ops
 coverage_routes = [route for route in router.routes if getattr(route, "path", None) == "/api/coverage"]
 assert len(coverage_routes) == 1
 assert coverage_routes[0].methods == {"POST"}
+warning_routes = [route for route in router.routes if getattr(route, "path", None) == "/api/warnings"]
+assert len(warning_routes) == 1 and warning_routes[0].methods == {"POST"}
 station_routes = [route for route in router.routes if getattr(route, "path", None) == "/api/stations"]
 assert len(station_routes) == 1 and station_routes[0].methods == {"GET"}
 calendar_routes = [route for route in router.routes if getattr(route, "path", None) == "/api/price-calendar"]
