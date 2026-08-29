@@ -1,10 +1,10 @@
 # FareWeave
 
-![FareWeave – self-hosted travel comparison without AI](docs/assets/readme-hero.jpg)
+![FareWeave – self-hosted deterministic travel comparison](docs/assets/readme-hero.jpg)
 
 [← Language selection](README.md) · [Deutsch](README.de.md)
 
-**FareWeave is a self-hosted travel comparison service without AI, focused on journeys originating in Germany.**
+**FareWeave is an independent, self-hosted, deterministic travel comparison service focused on journeys originating in Germany.**
 
 Rail, the Deutschlandticket, split tickets, FlixTrain, FlixBus, flights, airport feeders, transfers, and accommodation are combined into a single itinerary. FareWeave does not merely look for a low price somewhere. Every part of the journey must fit together both chronologically and logically.
 
@@ -38,7 +38,7 @@ The feeder must arrive before the flight. A configured airport buffer must actua
 
 That sounds obvious. Once several data sources are combined, it no longer is.
 
-This is precisely why **no AI decides** which connection is supposedly sensible in FareWeave.
+This is why FareWeave processes connections using clear and traceable rules.
 
 ## Split ticketing is built in
 
@@ -92,7 +92,7 @@ Warnings never alter connections, ranking, or prices and cannot trigger automati
 
 While looking for usable data sources, I found [trvl](https://github.com/MikkoParkkola/trvl).
 
-trvl is not a finished travel comparison website. It is a local tool and extensive provider layer intended primarily for AI assistants and MCP clients. Those providers were precisely what made it interesting for FareWeave.
+trvl is not a finished travel comparison website. It is a local tool and an extensive provider layer for travel data. Those providers were precisely what made it interesting for FareWeave.
 
 FareWeave therefore uses trvl as a **partial foundation**, especially for selected flight and accommodation data. It is not a trvl frontend.
 
@@ -144,18 +144,6 @@ Depending on the journey component, this may lead to Deutsche Bahn, the relevant
 
 The actual booking always takes place with the provider. Externally supplied prices may change before the booking page is opened. FareWeave therefore does not guarantee a final price and never performs bookings itself.
 
-## Why without AI?
-
-trvl was built to provide real travel data to AI assistants. That is useful for its intended purpose, but I did not want to rely on an AI for the actual decision about an itinerary.
-
-If a departure is at 06:07, it is at 06:07. If a two-hour airport buffer is requested, two hours must be available. If a split ticket costs EUR 27.80, that price must not suddenly be assigned to the through DB ticket. If the Deutschlandticket fully covers a connection, its additional ticket cost must not suddenly become a single fare returned by a transport association.
-
-These are not questions a language model should interpret.
-
-**No AI decides which connection is supposedly sensible.**
-
-FareWeave processes these rules deterministically.
-
 ## Developed for Tarnkappe.info
 
 FareWeave was originally developed for [Tarnkappe.info](https://tarnkappe.info/).
@@ -163,33 +151,6 @@ FareWeave was originally developed for [Tarnkappe.info](https://tarnkappe.info/)
 It did not begin as a demo or theoretical journey planner. I needed a solution for assembling real journeys more quickly, including DB fares, split ticketing, and the alternatives alongside them.
 
 That internal tool gradually became the public FareWeave project. Once it is built and works, it may as well be useful to others.
-
-## Vibe coding, but not blindly
-
-FareWeave operates **without AI in production and in actual journey decisions**. That does not mean no AI tools were used during development.
-
-Given the number of provider interfaces, response formats, fare rules, logs, edge cases, and regression tests, AI-assisted development tools—and some of what is now commonly called vibe coding—were also used.
-
-A project like this cannot be built by simply entering one instruction and receiving a finished journey comparison service.
-
-Anyone who does not understand the code will not notice when a Cologne/Bonn connection is suddenly accepted as BER, a local association fare becomes a normal DB fare, a split fare is assigned to the wrong ticket, or an overnight connection bypasses a hard departure limit.
-
-The person behind the project must understand, reproduce, and verify precisely these kinds of errors.
-
-FareWeave therefore follows a simple workflow:
-
-```text
-Reproduce the error
-→ regression test must fail
-→ fix the cause
-→ the same test must pass
-→ complete test suite
-→ real live test
-```
-
-A fix is not finished merely because the code looks plausible.
-
-Vibe coding was a tool used to build FareWeave. **It is not the logic FareWeave runs on.**
 
 ## Technical overview
 
@@ -466,17 +427,10 @@ complete default stack commercially must review trvl's licence terms separately.
 
 See [THIRD_PARTY.md](THIRD_PARTY.md) for details.
 
-## Support Tarnkappe
+## Support
 
-FareWeave was created for Tarnkappe.info and is made publicly available.
+FareWeave is developed independently and remains free to use. Donations are necessary for continued development, infrastructure operation, and new features because server costs and development work are ongoing.
 
-If you find FareWeave useful and would like to support the work behind it, the current
-options are available on the official donation page:
+If the project helps you, your support helps fund its continued development.
 
-**[Support Tarnkappe.info](https://tarnkappe.info/spenden/)**
-
-Wallet addresses are deliberately not duplicated in this README. If they change, no old
-address should remain in the repository.
-
-If FareWeave saves time on a journey or finds a few euros that would otherwise have been
-left in the ticket price, you are of course welcome to send some of that Tarnkappe's way.
+**[Support FareWeave](https://tarnkappe.info/spenden/)**

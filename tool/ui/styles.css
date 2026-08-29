@@ -309,11 +309,16 @@ body {
 .action-link { display: inline-flex; align-items: center; min-height: 38px; padding: 8px 12px; border: 1px solid #a9cbd2; border-radius: 9px; background: #edf8fa; font-weight: 800; text-decoration: none; }
 .action-link:hover { background: #dff2f5; }
 
+.support-panel { width:min(100%, 760px); margin:30px auto 0; padding:22px 24px; border:1px solid var(--line); border-radius:14px; background:rgba(255,255,255,.64); color:var(--muted); }
+.support-panel h2 { margin:0 0 10px; color:var(--text); font-size:20px; }
+.support-panel p { margin:7px 0; line-height:1.55; }
+.support-panel a { display:inline-block; margin-top:8px; color:#386b78; font-weight:700; }
 .project-credit { display:flex; flex-direction:column; justify-content:center; align-items:center; gap:7px; width:min(calc(100% - 48px), 1132px); margin:20px auto 0; padding:0 0 24px; color:var(--muted); font-size:16px; line-height:1.45; text-align:center; overflow-wrap:anywhere; }
 .project-credit a { color: #386b78; text-decoration: none; font-weight: 700; }
 .project-credit a:hover { text-decoration: underline; }
 .project-credit [aria-hidden="true"] { display:none; }
 @media (max-width: 620px) {
+  .support-panel { padding:18px; }
   .project-credit { width:calc(100% - 32px); margin-top:16px; padding-bottom:20px; }
   .project-credit [aria-hidden="true"] { display:none; }
 }

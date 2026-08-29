@@ -147,9 +147,13 @@ assert html.index('id="splitTicket"') < html.index('id="ticketPanel"')
 assert html.index('id="searchButton"') < html.index('<details class="advanced">')
 assert "Weitere Optionen" not in html and "Technische Einstellungen" in html
 
-for credit in ["Entwickelt von lesecuritae", "Mit Vibe-Coding-Unterstützung", "Nutzt trvl für ausgewählte Providerabfragen", "https://github.com/MikkoParkkola/trvl"]:
+for credit in ["Entwickelt von lesecuritae", "Eigenständiger, deterministischer Reisevergleich mit Split-Ticketing.", "Nutzt trvl für ausgewählte Providerabfragen", "https://github.com/MikkoParkkola/trvl"]:
     assert credit in html
 assert 'class="project-credit"' in html
+assert 'class="support-panel"' in html
+assert "FareWeave wird unabhängig entwickelt und bleibt frei nutzbar." in html
+assert "Wenn dir das Projekt hilft, unterstützt du damit die weitere Entwicklung." in html
+assert "FareWeave unterstützen" in html
 assert "justify-content:center" in css
 assert "margin:20px auto 0" in css
 assert "margin: -42px" not in css
@@ -159,5 +163,4 @@ assert "calc((100vw - 1132px)/2)" in css
 assert "width:min(calc(100% - 48px), 1132px)" in css
 assert "min-height:44px" in css
 
-assert "Komplett ohne KI: eigenständiger, deterministischer Reisevergleich mit Split-Ticketing" in html
 assert "BetterBahn" not in html

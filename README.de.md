@@ -1,10 +1,10 @@
 # FareWeave
 
-![FareWeave – selbst gehosteter Reisevergleich ohne KI](docs/assets/readme-hero.jpg)
+![FareWeave – selbst gehosteter deterministischer Reisevergleich](docs/assets/readme-hero.jpg)
 
 [← Sprachauswahl](README.md) · [English](README.en.md)
 
-**FareWeave ist ein selbst gehosteter Reisevergleich ohne KI mit Fokus auf Reisen aus Deutschland.**
+**FareWeave ist ein eigenständiger, selbst gehosteter und deterministischer Reisevergleich mit Fokus auf Reisen aus Deutschland.**
 
 Bahn, Deutschlandticket, Split-Tickets, FlixTrain, FlixBus, Flüge, Flughafenzubringer, Transfers und Unterkünfte landen in einer gemeinsamen Planung. FareWeave schaut dabei nicht nur, ob irgendwo ein günstiger Preis auftaucht. Die einzelnen Teile müssen zeitlich und logisch zusammenpassen.
 
@@ -38,7 +38,7 @@ Der Zubringer muss vor dem Flug ankommen. Ein eingestellter Flughafenpuffer muss
 
 Das klingt selbstverständlich. Sobald mehrere Datenquellen zusammenkommen, ist es das nicht mehr.
 
-Genau deshalb entscheidet bei FareWeave **keine KI**, welche Verbindung angeblich sinnvoll ist.
+Genau deshalb verarbeitet FareWeave Verbindungen anhand klarer, nachvollziehbarer Regeln.
 
 ## Split-Ticketing ist direkt integriert
 
@@ -92,7 +92,7 @@ Die Warnungen verändern weder Verbindung, Ranking noch Preis und lösen keine a
 
 Bei der Suche nach brauchbaren Datenquellen bin ich auf [trvl](https://github.com/MikkoParkkola/trvl) gestoßen.
 
-trvl ist keine fertige Reisevergleichs-Webseite. Es ist ein lokales Werkzeug und eine umfangreiche Provider-Schicht, die vor allem für KI-Assistenten und MCP-Clients gedacht ist. Genau diese Provider waren für FareWeave interessant.
+trvl ist keine fertige Reisevergleichs-Webseite. Es ist ein lokales Werkzeug und eine umfangreiche Provider-Schicht für Reisedaten. Genau diese Provider waren für FareWeave interessant.
 
 FareWeave nutzt trvl deshalb als **Teilbasis**, vor allem für ausgewählte Flug- und Unterkunftsdaten. Es ist aber kein trvl-Frontend.
 
@@ -144,18 +144,6 @@ Je nach Reiseteil führt das beispielsweise zur Deutschen Bahn, zum jeweiligen R
 
 Die eigentliche Buchung erfolgt immer beim Anbieter. Extern gelieferte Preise können sich bis zum Öffnen der Buchungsseite ändern. FareWeave garantiert deshalb keinen Endpreis und führt selbst keine Buchung aus.
 
-## Warum ohne KI?
-
-trvl wurde gerade dafür gebaut, einem KI-Assistenten echte Reisedaten zur Verfügung zu stellen. Das ist für diesen Einsatzzweck interessant. Für die eigentliche Entscheidung über eine Reisekette wollte ich mich darauf aber nicht verlassen.
-
-Wenn eine Abfahrt um 06:07 Uhr stattfindet, dann findet sie um 06:07 Uhr statt. Wenn zwei Stunden Flughafenpuffer verlangt werden, müssen zwei Stunden vorhanden sein. Wenn ein Split-Ticket 27,80 Euro kostet, darf dieser Preis nicht plötzlich beim durchgehenden DB-Ticket landen. Und wenn das Deutschlandticket eine Verbindung vollständig abdeckt, sind die zusätzlichen Ticketkosten nicht plötzlich ein vom Verbund gelieferter Einzelfahrscheinpreis.
-
-Das sind keine Fragen, bei denen ein Sprachmodell etwas interpretieren sollte.
-
-**Eine KI entscheidet dabei nicht, welche Verbindung angeblich sinnvoll ist.**
-
-FareWeave verarbeitet solche Regeln deterministisch.
-
 ## Für Tarnkappe.info entwickelt
 
 FareWeave wurde ursprünglich für [Tarnkappe.info](https://tarnkappe.info/) entwickelt.
@@ -163,33 +151,6 @@ FareWeave wurde ursprünglich für [Tarnkappe.info](https://tarnkappe.info/) ent
 Der Ausgangspunkt war keine Demo und kein theoretischer Reiseplaner. Ich brauchte selbst eine Lösung, mit der sich reale Reisen schneller zusammensetzen lassen, inklusive DB-Preisen, Split-Ticketing und den Alternativen daneben.
 
 Aus diesem internen Werkzeug wurde nach und nach das öffentliche Projekt FareWeave. Wenn es schon gebaut ist und funktioniert, kann es schließlich auch anderen nützen.
-
-## Vibe Coding, aber nicht blind
-
-FareWeave arbeitet **im Betrieb und bei der eigentlichen Reiseentscheidung ohne KI**. Das bedeutet nicht, dass bei der Entwicklung keinerlei KI-Werkzeuge benutzt wurden.
-
-Bei der Menge an Provider-Schnittstellen, Antwortformaten, Tarifregeln, Logs, Randfällen und Regressionstests kamen auch KI-gestützte Entwicklungswerkzeuge und teilweise das inzwischen gern so bezeichnete Vibe Coding zum Einsatz.
-
-Nur funktioniert Vibe Coding bei so einem Projekt nicht nach dem Prinzip: eine Anweisung rein, fertiger Reisevergleich raus.
-
-Wer den Code dahinter nicht versteht, merkt auch nicht, wenn eine Verbindung nach Köln/Bonn plötzlich als BER durchgeht, ein Verbundtarif zum normalen DB-Preis wird, ein Splitpreis beim falschen Ticket landet oder eine Nachtverbindung eine harte Abfahrtsgrenze umgeht.
-
-Genau solche Fehler muss der Mensch hinter dem Projekt verstehen, reproduzieren und anschließend prüfen können.
-
-Für FareWeave hat sich daraus eine einfache Arbeitsweise ergeben:
-
-```text
-Fehler reproduzieren
-→ Regressionstest muss rot sein
-→ Ursache beheben
-→ derselbe Test muss grün sein
-→ kompletter Testsatz
-→ echter Livetest
-```
-
-Ein Fix ist nicht deshalb fertig, weil der Code plausibel aussieht.
-
-Vibe Coding war beim Bau ein Werkzeug. **Es ist nicht die Logik, auf der FareWeave läuft.**
 
 ## Technik im Überblick
 
@@ -448,14 +409,10 @@ Drittanbieter behalten ihre eigenen Lizenzen. Besonders wichtig ist `trvl v1.21.
 
 Details stehen in [THIRD_PARTY.md](THIRD_PARTY.md).
 
-## Tarnkappe unterstützen
+## Unterstützung
 
-FareWeave ist für Tarnkappe.info entstanden und wird öffentlich bereitgestellt.
+FareWeave wird unabhängig entwickelt und bleibt frei nutzbar. Für die Weiterentwicklung, den Betrieb der Infrastruktur und neue Funktionen sind Spenden notwendig, da Serverkosten und Entwicklungsaufwand dauerhaft anfallen.
 
-Wer FareWeave nützlich findet und die Arbeit dahinter unterstützen möchte, findet die jeweils aktuellen Möglichkeiten auf der offiziellen Spendenseite:
+Wenn dir das Projekt hilft, unterstützt du damit die weitere Entwicklung.
 
-**[Tarnkappe.info unterstützen](https://tarnkappe.info/spenden/)**
-
-Wallet-Adressen werden bewusst nicht zusätzlich in dieser README festgeschrieben. Wenn sich dort etwas ändert, soll im Repository keine alte Adresse liegen bleiben.
-
-Wenn FareWeave bei einer Reise Zeit spart oder ein paar Euro findet, die sonst beim Ticketpreis liegen geblieben wären, darf davon natürlich gern etwas bei Tarnkappe landen.
+**[FareWeave unterstützen](https://tarnkappe.info/spenden/)**

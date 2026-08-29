@@ -1,6 +1,6 @@
 # FareWeave
 
-![FareWeave – self-hosted travel comparison without AI](docs/assets/readme-hero.jpg)
+![FareWeave – self-hosted deterministic travel comparison](docs/assets/readme-hero.jpg)
 
 ## Choose your language / Sprache wählen
 
