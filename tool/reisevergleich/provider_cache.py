@@ -10,7 +10,7 @@ from . import transitous as raw_transitous
 from . import trvl as raw_trvl
 from . import gtfs_flix
 
-CACHE_GENERATION = f"{APP_VERSION}-routing-v3"
+CACHE_GENERATION = f"{APP_VERSION}-routing-v4"
 DB_TTL = 600
 SPLIT_TTL = 600
 FLIX_TTL = 600
@@ -46,6 +46,7 @@ async def flix_search(request):
             return {"status": "failed", "routes": [], "candidate_routes": [], "provider_status": {"provider": "flix-gtfs", "ok": False, "error": f"{type(schedule).__name__}: {schedule}"}}
         if isinstance(live, BaseException):
             live = {"routes": [], "provider_status": {"provider": "flix-api", "ok": False, "error": f"{type(live).__name__}: {live}"}}
+        live = await gtfs_flix.normalize_live_routes(live)
         return gtfs_flix.enrich_live_prices(schedule, live)
     return await cached_call("gtfs.flix-with-live-prices", _key(request), FLIX_TTL, combined)
 

@@ -1,4 +1,12 @@
 # Changelog
+## 0.2.8 - 2026-08-29
+
+- Mehrteilige FlixTrain-Liveverbindungen lösen technische Stop-UUIDs deterministisch über den vorhandenen Flix-GTFS-Katalog auf.
+- Betreiber und Modus werden für jedes Live-Leg aus der klassifizierten Flix-Verbindung übernommen; FlixTrain-Abschnitte erscheinen nicht mehr fälschlich als FlixBus.
+- Direkte Verbindungen mit nur einem Leg sowie FlixTrain-Umstiegsverbindungen behalten eine vollständige, UI-kompatible Teilstreckenstruktur.
+- Eine reale Regression Leipzig Hbf–Dortmund Hbf deckt Halle (Saale) Hbf und Berlin Hbf als Zwischenhalte, Stations-IDs, Zeiten und Betreiber ab.
+- Die Routing-Cachegeneration wurde erhöht, damit bereits gespeicherte Live-Routen mit UUID-Haltepunkten nicht weiter ausgeliefert werden.
+
 ## 0.2.7 - 2026-08-24
 
 - FlixTrain-/FlixBus-Stations-, Zeit- und Linienobjekte werden vor der Darstellung normalisiert; `[object Object]`, technische UUIDs und leere Teilstrecken erscheinen nicht mehr.

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import copy
 import csv
 import io
 import json
@@ -400,6 +401,95 @@ async def discover_stops(origin: str, destination: str) -> dict[str, Any]:
         return {"origin_stops": origin_stops, "destination_stops": destination_stops, "source": "flix-gtfs"}
     except Exception as exc:
         return {"origin_stops": [], "destination_stops": [], "source": "flix-gtfs", "error": f"{type(exc).__name__}: {exc}"}
+
+
+def _live_stop_ids(data: dict[str, Any]) -> set[str]:
+    station_ids: set[str] = set()
+    for collection in (data.get("candidate_routes"), data.get("routes")):
+        for route in collection or []:
+            if not isinstance(route, dict):
+                continue
+            for leg in route.get("legs") or []:
+                if not isinstance(leg, dict):
+                    continue
+                for side in ("departure", "arrival"):
+                    stop = leg.get(side)
+                    if not isinstance(stop, dict):
+                        continue
+                    station_id = str(stop.get("station_id") or stop.get("station") or "").strip()
+                    if re.fullmatch(r"[0-9a-fA-F]{8}-[0-9a-fA-F-]{27,}", station_id):
+                        station_ids.add(station_id)
+    return station_ids
+
+
+def _gtfs_stop_directory(database: Path, station_ids: set[str]) -> dict[str, dict[str, Any]]:
+    if not station_ids:
+        return {}
+    placeholders = ",".join("?" for _ in station_ids)
+    with sqlite3.connect(database) as db:
+        db.row_factory = sqlite3.Row
+        rows = list(db.execute(
+            f"SELECT stop_id,name,latitude,longitude FROM stop WHERE stop_id IN ({placeholders})",
+            tuple(sorted(station_ids)),
+        ))
+    return {
+        str(row["stop_id"]): {
+            "station": row["name"],
+            "station_id": row["stop_id"],
+            "latitude": row["latitude"],
+            "longitude": row["longitude"],
+        }
+        for row in rows
+    }
+
+
+async def normalize_live_routes(
+    live: dict[str, Any], *, database: Path | None = None,
+) -> dict[str, Any]:
+    """Normalize trvl's Flix legs against the authoritative Flix GTFS stops.
+
+    trvl exposes intermediate stops as UUIDs while the autocomplete endpoint
+    only resolves place-name searches.  The GTFS feed uses the same UUIDs, so
+    it is the deterministic source for leg endpoints.  Route classification
+    remains authoritative for the operator shown on every leg.
+    """
+    output = copy.deepcopy(live)
+    station_ids = _live_stop_ids(output)
+    if database is None and station_ids:
+        try:
+            database = await ensure_feed()
+        except Exception:
+            database = None
+    try:
+        directory = await asyncio.to_thread(_gtfs_stop_directory, database, station_ids) if database else {}
+    except (OSError, sqlite3.Error):
+        LOG.exception("Flix-Live-Haltepunkte konnten nicht aus GTFS aufgelöst werden")
+        directory = {}
+
+    visited: set[int] = set()
+    for collection in (output.get("candidate_routes"), output.get("routes")):
+        for route in collection or []:
+            if not isinstance(route, dict) or id(route) in visited:
+                continue
+            visited.add(id(route))
+            kind = str(route.get("flix_kind") or route.get("type") or "").casefold()
+            operator = "FlixTrain" if kind == "train" else "FlixBus" if kind == "bus" else "FlixBus/FlixTrain"
+            for leg in route.get("legs") or []:
+                if not isinstance(leg, dict):
+                    continue
+                leg_kind = str(leg.get("type") or leg.get("mode") or kind).casefold() or kind
+                leg["mode"] = leg_kind
+                leg["provider"] = "FlixTrain" if leg_kind == "train" else "FlixBus" if leg_kind == "bus" else operator
+                for side in ("departure", "arrival"):
+                    stop = leg.get(side)
+                    if not isinstance(stop, dict):
+                        continue
+                    station_id = str(stop.get("station_id") or stop.get("station") or "").strip()
+                    if station_id in directory:
+                        stop.update({key: value for key, value in directory[station_id].items() if value not in (None, "")})
+                    elif station_id in station_ids:
+                        stop["station_id"] = station_id
+    return output
 
 
 def enrich_live_prices(schedule: dict[str, Any], live: dict[str, Any]) -> dict[str, Any]:
